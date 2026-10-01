@@ -1,0 +1,16 @@
+import {DatabaseSync} from 'node:sqlite';
+import {mkdirSync,writeFileSync} from 'node:fs';
+import {resolve,join} from 'node:path';
+import {seedManualWorkspace} from '../lib/manual-fixtures.mjs';
+const dir=resolve(process.env.CLOUDHERON_DATA||'data'),db=new DatabaseSync(join(dir,'cloudheron.sqlite'));
+db.exec('PRAGMA foreign_keys=ON;PRAGMA busy_timeout=5000');
+const d={db,dir,one:(q,...a)=>db.prepare(q).get(...a),run:(q,...a)=>db.prepare(q).run(...a),tx:fn=>{db.exec('BEGIN IMMEDIATE');try{const out=fn();db.exec('COMMIT');return out;}catch(e){db.exec('ROLLBACK');throw e;}}};
+const users=db.prepare("SELECT id,name,role FROM users WHERE role='admin' AND active=1").all();
+const requested=process.argv[2];const u=requested?users.find(u=>u.name===requested):users.length===1?users[0]:null;
+if(!u)throw Error('请指定要使用的有效管理员姓名');
+const jobsBefore=d.one('SELECT count(*) n FROM jobs').n;
+const workspace=seedManualWorkspace(d,u);
+if(jobsBefore!==d.one('SELECT count(*) n FROM jobs').n)throw Error('测试数据载入不应产生任务');
+const counts={cases:d.one('SELECT count(*) n FROM project_test_cases WHERE project_id=?',workspace.project_id).n,workflows:d.one('SELECT count(*) n FROM workflows WHERE project_id=?',workspace.project_id).n,chats:d.one('SELECT count(*) n FROM chats WHERE project_id=?',workspace.project_id).n,assets:d.one('SELECT count(*) n FROM assets WHERE project_id=?',workspace.project_id).n};
+db.close();
+const record=resolve('../.work/manual-test-project');mkdirSync(record,{recursive:true});writeFileSync(join(record,'manifest.json'),JSON.stringify({name:workspace.name,...workspace,counts,model_tasks_created:0},null,2));console.log(JSON.stringify({name:workspace.name,project_id:workspace.project_id,counts,url:'http://127.0.0.1:8800/#projects/'+workspace.project_id,cases_url:'http://127.0.0.1:8800/#testing/'+workspace.project_id}));

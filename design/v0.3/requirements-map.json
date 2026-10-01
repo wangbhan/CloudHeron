@@ -1,0 +1,510 @@
+[
+  {
+    "id": "DES-001",
+    "title": "登录与团队接入",
+    "route": "login",
+    "reqs": [
+      "REQ-001",
+      "REQ-016",
+      "REQ-031",
+      "REQ-032",
+      "REQ-026"
+    ],
+    "goal": "使用云鹭独立产品图标与白鹭云海背景，悬停呈现柔光、雾化和轻微视差，成员通过表单登录。",
+    "interactions": [
+      "鼠标悬停光雾与轻微视差",
+      "离开背景恢复静态",
+      "邮箱密码表单校验与错误反馈",
+      "深浅主题下背景、渐隐、文字和表单同步换色"
+    ],
+    "states": [
+      "未填写",
+      "格式错误",
+      "登录处理中",
+      "账号停用"
+    ],
+    "assumptions": [
+      "以 RAW-009 用户图片澄清为准；场景与图标以原图局部编辑提取。触屏及减少动态效果模式静态展示，不影响表单输入。",
+      "登录背景与表单共享主题底色；悬停光雾按当前主题适配。"
+    ],
+    "version": "v0.3.2",
+    "screenshot": "design/v0.3/screenshots/DES-001.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-002",
+    "title": "项目产物分类与共享",
+    "route": "projects",
+    "reqs": [
+      "REQ-001",
+      "REQ-002",
+      "REQ-004",
+      "REQ-027"
+    ],
+    "goal": "按对话创作和工作流分类项目产物，点击进入对应历史或工作流。",
+    "interactions": [
+      "来源分类筛选",
+      "打开具体产物与对应上下文",
+      "搜索项目内容",
+      "项目共享设置"
+    ],
+    "states": [
+      "项目列表",
+      "空列表",
+      "无访问权限",
+      "共享设置"
+    ],
+    "assumptions": [
+      "共享权限粒度仍待确认；列表以项目中的具体内容为入口。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-002.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-003",
+    "title": "节点工作流与 JSON",
+    "route": "workflow",
+    "reqs": [
+      "REQ-005",
+      "REQ-006",
+      "REQ-007",
+      "REQ-028"
+    ],
+    "goal": "配置图片与视频生成节点，保存、复用并查看 JSON。",
+    "interactions": [
+      "选择与拖动节点",
+      "修改节点参数",
+      "切换画布与 JSON",
+      "校验、导入、导出、保存 JSON"
+    ],
+    "states": [
+      "画布",
+      "选中节点",
+      "JSON 有效",
+      "JSON 格式错误"
+    ],
+    "assumptions": [
+      "JSON 字段、导入导出和节点目录为设计方案，正式契约待评审。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-003.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-004",
+    "title": "AI 分析与修改确认",
+    "route": "workflow",
+    "reqs": [
+      "REQ-008",
+      "REQ-009",
+      "REQ-010"
+    ],
+    "goal": "在工作流内对话分析或提出修改；修改经过一次批量确认才应用。",
+    "interactions": [
+      "分析结果不改配置",
+      "修改建议展示前后差异",
+      "确认本次修改",
+      "取消保持原配置"
+    ],
+    "states": [
+      "分析回复",
+      "修改预览",
+      "已应用但未运行",
+      "已取消"
+    ],
+    "assumptions": [
+      "一次确认覆盖本次整批修改；示例为当前画面调整成雨夜，确认后等待手动运行。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-004.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-005",
+    "title": "工作流内进度、产物与错误",
+    "route": "workflow",
+    "reqs": [
+      "REQ-010",
+      "REQ-011",
+      "REQ-029"
+    ],
+    "goal": "手动运行，在当前工作流内显示进度、产物及失败节点。",
+    "interactions": [
+      "点击运行按钮",
+      "查看产物页签",
+      "显示失败节点与错误详情"
+    ],
+    "states": [
+      "待运行",
+      "运行中",
+      "成功",
+      "失败"
+    ],
+    "assumptions": [
+      "独立运行记录页面按用户要求移除；状态和产物为交互演示。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-005.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-006",
+    "title": "图片视频对话与历史",
+    "route": "create",
+    "reqs": [
+      "REQ-012",
+      "REQ-013",
+      "REQ-014",
+      "REQ-015",
+      "REQ-028"
+    ],
+    "goal": "对话调用 Agent、Skill 与模型生成图片或视频，保留具体请求与产物。",
+    "interactions": [
+      "图片和视频类型切换",
+      "查看指定对话历史",
+      "生成任务预览",
+      "产物进入项目"
+    ],
+    "states": [
+      "开始创作",
+      "任务预览",
+      "生成中",
+      "生成结果"
+    ],
+    "assumptions": [
+      "直接创作任务预览后的执行规则仍待确认；媒体为静态概念预览。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-006.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-007",
+    "title": "Agent 与 Skill 库",
+    "route": "skills",
+    "reqs": [
+      "REQ-013",
+      "REQ-014",
+      "REQ-028"
+    ],
+    "goal": "展示图片、视频与提示词 Agent，以及参考资产和生成描述 Skill。",
+    "interactions": [
+      "Agent 与 Skill 切换",
+      "能力搜索",
+      "查看详情和启用 Skill"
+    ],
+    "states": [
+      "内置能力",
+      "已启用",
+      "停用",
+      "扩展详情"
+    ],
+    "assumptions": [
+      "自定义、安装、发布能力均作为候选；仅展示扩展流程草案。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-007.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-008",
+    "title": "团队资产库与资产详情",
+    "route": "assets",
+    "reqs": [
+      "REQ-003",
+      "REQ-004",
+      "REQ-018",
+      "REQ-028"
+    ],
+    "goal": "管理角色、场景、道具、风格参考，以及生成的图片与视频。",
+    "interactions": [
+      "资产分类与搜索",
+      "详情中的版本、使用位置与权限",
+      "选择引用到项目"
+    ],
+    "states": [
+      "资产网格",
+      "资产详情",
+      "无访问权限",
+      "无匹配结果"
+    ],
+    "assumptions": [
+      "当前范围不含声音、分镜资产管理；版本与引用规则仍待评审。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-008.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-009",
+    "title": "一致性检查与剧情状态",
+    "route": "consistency",
+    "reqs": [
+      "REQ-018",
+      "REQ-019"
+    ],
+    "goal": "独立检查页面从当前设计中收起，参考资产使用方式转入 DES-018。",
+    "interactions": [
+      "查看参考资产",
+      "逐项对比与定位镜头",
+      "修正建议进入对应镜头"
+    ],
+    "states": [
+      "待检查",
+      "通过",
+      "需复核",
+      "人工锁定参考"
+    ],
+    "assumptions": [
+      "这是界面简化方案，REQ-019 的一致性目标仍待用户澄清；未取消该目标，也未承诺自动检查。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.2/screenshots/DES-009.png",
+    "status": "已废止"
+  },
+  {
+    "id": "DES-010",
+    "title": "分镜编辑与多轨时间线",
+    "route": "timeline",
+    "reqs": [
+      "REQ-020",
+      "REQ-018",
+      "REQ-019"
+    ],
+    "goal": "按用户最新要求移除分镜与剪辑，REQ-020 已撤销。",
+    "interactions": [
+      "选择分镜卡与时间线片段",
+      "编辑镜头与对白",
+      "移动播放指针",
+      "导出设置预览"
+    ],
+    "states": [
+      "镜头选中",
+      "素材待生成",
+      "剪辑预览",
+      "导出设置"
+    ],
+    "assumptions": [
+      "历史稿保留追踪，当前原型不再提供该页面。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.2/screenshots/DES-010.png",
+    "status": "已废止"
+  },
+  {
+    "id": "DES-011",
+    "title": "模型配置与能力登记",
+    "route": "models",
+    "reqs": [
+      "REQ-015",
+      "REQ-004"
+    ],
+    "goal": "配置平台或用户 API 模型，登记协议、任务能力和可使用成员。",
+    "interactions": [
+      "新增模型配置表单",
+      "选择协议与能力",
+      "测试连接演示",
+      "查看凭据使用范围"
+    ],
+    "states": [
+      "已配置",
+      "连接校验",
+      "失败反馈",
+      "受限模型"
+    ],
+    "assumptions": [
+      "凭据使用权与查看权分开作为候选；设计稿不发送外部请求或保存真实密钥。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-011.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-012",
+    "title": "成员管理与权限矩阵",
+    "route": "team",
+    "reqs": [
+      "REQ-001",
+      "REQ-004",
+      "REQ-017"
+    ],
+    "goal": "邀请、管理团队成员并配置项目、资产和模型的权限。",
+    "interactions": [
+      "成员列表与邀请",
+      "查看角色定义",
+      "项目与资产授权面板"
+    ],
+    "states": [
+      "有效成员",
+      "待加入",
+      "停用",
+      "权限编辑"
+    ],
+    "assumptions": [
+      "管理员、编辑者、查看者为候选角色；精确粒度需用户确认。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-012.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-013",
+    "title": "工作流 API 发布",
+    "route": "api",
+    "reqs": [
+      "REQ-021",
+      "REQ-007"
+    ],
+    "goal": "发布图片或视频生成工作流，配置版本、输入输出及调用权限。",
+    "interactions": [
+      "配置工作流输入输出",
+      "发布预览",
+      "查看异步调用示例"
+    ],
+    "states": [
+      "草稿",
+      "待发布",
+      "已发布示例",
+      "调用失败"
+    ],
+    "assumptions": [
+      "版本固定与异步任务为候选方案；原型按钮只演示发布状态。"
+    ],
+    "version": "v0.3",
+    "screenshot": "design/v0.3/screenshots/DES-013.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-014",
+    "title": "需求映射与阶段记录",
+    "route": "review",
+    "reqs": [
+      "REQ-022",
+      "REQ-023",
+      "REQ-025"
+    ],
+    "goal": "在评审工具中查看全部需求与设计登记，定位页面、需求来源、交互和历史废止条目。",
+    "interactions": [
+      "按需求检索设计",
+      "页面跳转",
+      "查看设计假设与截图定位"
+    ],
+    "states": [
+      "设计评审中",
+      "待评审条目",
+      "覆盖说明"
+    ],
+    "assumptions": [
+      "评审工具独立于产品界面；用户本轮指令授权开始设计草案，需求仍未冻结。"
+    ],
+    "version": "v0.3.1",
+    "screenshot": "design/v0.3/screenshots/DES-014.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-015",
+    "title": "云鹭品牌与风格图",
+    "route": "brand",
+    "reqs": [
+      "REQ-024",
+      "REQ-030",
+      "REQ-031",
+      "REQ-032"
+    ],
+    "goal": "使用已确定名称云鹭 · CloudHeron，展示白鹭、云与雾蓝品牌风格图。",
+    "interactions": [
+      "独立透明产品图标在左上角显示",
+      "品牌页展示完整风格板",
+      "登录页使用清理后的白鹭云海背景"
+    ],
+    "states": [
+      "名称已确定",
+      "品牌风格图"
+    ],
+    "assumptions": [
+      "完整风格板保留作说明；登录不再直接显示风格板。清理背景、提取透明图标均使用内置 imagegen 编辑，提示词留档。"
+    ],
+    "version": "v0.3.1",
+    "screenshot": "design/v0.3/screenshots/DES-015.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-016",
+    "title": "灰阶视觉规范与主题",
+    "route": "style",
+    "reqs": [
+      "REQ-026",
+      "REQ-031"
+    ],
+    "goal": "以 yingma.tv 公开页面的视觉语言重做全站设计，支持深浅主题预览。",
+    "interactions": [
+      "切换深浅主题",
+      "查看视觉规范",
+      "从规范页跳转登录页",
+      "核对深浅主题登录画面与表单的统一底色及边缘渐隐"
+    ],
+    "states": [
+      "深色主题",
+      "浅色主题",
+      "主要操作",
+      "次级操作",
+      "错误状态"
+    ],
+    "assumptions": [
+      "参考范围为公开登录页，工作台布局基于本项目需求延伸；未访问登录后的界面。"
+    ],
+    "version": "v0.3.2",
+    "screenshot": "design/v0.3/screenshots/DES-016.png",
+    "status": "待评审"
+  },
+  {
+    "id": "DES-017",
+    "title": "产物来源路由与历史定位",
+    "route": "projects",
+    "reqs": [
+      "REQ-027",
+      "REQ-002",
+      "REQ-007",
+      "REQ-012"
+    ],
+    "goal": "以稳定内容编号区分入口，定位对应对话或工作流及产物。",
+    "interactions": [
+      "对话卡片进入指定历史",
+      "工作流卡片进入指定配置与产物",
+      "刷新恢复对应内容"
+    ],
+    "states": [
+      "设计演示"
+    ],
+    "assumptions": [
+      "当前为本地交互演示，权限和服务端路由由后续开发实现。"
+    ],
+    "version": "v0.3",
+    "status": "待评审",
+    "screenshot": "design/v0.3/screenshots/DES-017.png"
+  },
+  {
+    "id": "DES-018",
+    "title": "参考资产选择与外观复用",
+    "route": "create",
+    "reqs": [
+      "REQ-018",
+      "REQ-019"
+    ],
+    "goal": "选择同一角色、场景或风格参考版本，帮助多次生成复用外观。",
+    "interactions": [
+      "打开参考资产选择",
+      "选择并展示参考标签"
+    ],
+    "states": [
+      "设计演示"
+    ],
+    "assumptions": [
+      "方案待评审；引用参考有助于减少差异，不代表模型自动保证外观一致或完成剧情检查。"
+    ],
+    "version": "v0.3",
+    "status": "待评审",
+    "screenshot": "design/v0.3/screenshots/DES-018.png"
+  }
+]

@@ -1,0 +1,36 @@
+{
+  "schema_version": "1.0",
+  "name": "无效循环验证",
+  "nodes": [
+    {
+      "id": "a",
+      "type": "prompt_agent",
+      "label": "a",
+      "params": {},
+      "position": {
+        "x": 50,
+        "y": 90
+      }
+    },
+    {
+      "id": "b",
+      "type": "prompt_agent",
+      "label": "b",
+      "params": {},
+      "position": {
+        "x": 350,
+        "y": 90
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "a",
+      "target": "b"
+    },
+    {
+      "source": "b",
+      "target": "a"
+    }
+  ]
+}

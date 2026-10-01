@@ -1,0 +1,51 @@
+{
+  "schema_version": "1.0",
+  "name": "导入测试 · 图片工作流",
+  "nodes": [
+    {
+      "id": "prompt",
+      "type": "prompt_input",
+      "label": "提示词输入",
+      "params": {
+        "prompt": "白鹭飞过云海，柔和晨光"
+      },
+      "position": {
+        "x": 40,
+        "y": 90
+      }
+    },
+    {
+      "id": "image",
+      "type": "image_generate",
+      "label": "图片生成",
+      "params": {
+        "model_id": "",
+        "size": "1024x1024"
+      },
+      "position": {
+        "x": 340,
+        "y": 90
+      }
+    },
+    {
+      "id": "output",
+      "type": "media_output",
+      "label": "产物输出",
+      "params": {},
+      "position": {
+        "x": 640,
+        "y": 90
+      }
+    }
+  ],
+  "edges": [
+    {
+      "source": "prompt",
+      "target": "image"
+    },
+    {
+      "source": "image",
+      "target": "output"
+    }
+  ]
+}
