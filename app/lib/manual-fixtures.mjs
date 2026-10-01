@@ -4,6 +4,7 @@ import {fileURLToPath} from 'node:url';
 import {id} from './security.mjs';
 import {template} from './workflow.mjs';
 import {agents} from './agents.mjs';
+import {librarySchema} from './workflow-library.mjs';
 const root=join(dirname(fileURLToPath(import.meta.url)),'..');
 export const manualCaseSchema=`CREATE TABLE IF NOT EXISTS project_test_cases (project_id TEXT NOT NULL REFERENCES projects(id),test_id TEXT NOT NULL,definition TEXT NOT NULL,PRIMARY KEY(project_id,test_id))`;
 
@@ -11,6 +12,8 @@ export function seedManualWorkspace(d,u){
   const key='manual_workspace_'+u.id,existing=d.one('SELECT value FROM meta WHERE key=?',key),old=existing?JSON.parse(existing.value):null;
   const cases=JSON.parse(readFileSync(join(root,'public/test-cases.json'),'utf8')),written=[];
   d.db.exec(manualCaseSchema);
+  d.db.exec(librarySchema);
+  d.run("INSERT OR IGNORE INTO workflow_versions(workflow_id,revision,document,action,saved_at) SELECT id,revision,document,'baseline',updated_at FROM workflows");
   try{return d.tx(()=>{
     const now=new Date().toISOString();
     const out=old&&d.one('SELECT id FROM projects WHERE id=?',old.project_id)?old:{project_id:id('project'),workflows:{},chats:{}};
@@ -27,7 +30,7 @@ export function seedManualWorkspace(d,u){
       if(kind==='video'){w.nodes[1].id='video';w.nodes[1].type='video_generate';w.nodes[1].label='视频生成';w.nodes[1].params={model_id:'',size:'1280x720',seconds:4,skill_ids:['skill_motion']};w.edges=[{source:'prompt',target:'video'},{source:'video',target:'output'}];}
       if(kind==='reference'){w.nodes.push({id:'reference',type:'reference_asset',label:'云鹭角色参考 v1',params:{asset_id:out.assets[0]},position:{x:40,y:310}});w.edges.push({source:'reference',target:'image'});w.nodes[1].params.skill_ids=['skill_reference'];}
       if(kind==='error')w.nodes[0].params.prompt='测试预期：图片生成节点因未配置模型报错，后续输出节点停止。';
-      const wid=id('wf');d.run('INSERT INTO workflows(id,project_id,name,document,updated_at) VALUES(?,?,?,?,?)',wid,out.project_id,name,JSON.stringify(w),now);out.workflows[kind]=wid;
+      const wid=id('wf');d.run('INSERT INTO workflows(id,project_id,name,document,updated_at) VALUES(?,?,?,?,?)',wid,out.project_id,name,JSON.stringify(w),now);d.run('INSERT INTO workflow_versions(workflow_id,revision,document,actor_id,action,saved_at) VALUES(?,1,?,?,?,?)',wid,JSON.stringify(w),u.id,'create',now);out.workflows[kind]=wid;
     }
     for(const a of agents){
       if(out.chats[a.id]&&d.one('SELECT id FROM chats WHERE id=?',out.chats[a.id]))continue;
@@ -43,7 +46,7 @@ export function seedManualWorkspace(d,u){
       'TST-007':'#workflow/'+out.workflows.image,'TST-008':'#workflow/'+out.workflows.image,'TST-009':'#workflow/'+out.workflows.error,
       'TST-010':'#workflow/'+out.workflows.image,'TST-011':'#create/'+out.chats.image,'TST-012':'#skills','TST-013':'#create/'+out.chats.image,
       'TST-014':'#create/'+out.chats.prompt,'TST-015':'#create/'+out.chats.video,'TST-016':'#workflow/'+out.workflows.reference,
-      'TST-017':'#projects/'+out.project_id,'TST-018':'#team','TST-019':'#api','TST-020':'#testing/'+out.project_id,'TST-021':'#workflow','TST-022':'#create/'+out.chats.image,'TST-023':'#create/'+out.chats.video
+      'TST-017':'#projects/'+out.project_id,'TST-018':'#team','TST-019':'#api','TST-020':'#testing/'+out.project_id,'TST-021':'#workflow','TST-022':'#create/'+out.chats.image,'TST-023':'#create/'+out.chats.video,'TST-024':'#workflow/templates','TST-025':'#workflow/'+out.workflows.image,'TST-026':'#workflow/'+out.workflows.image,'TST-027':'#workflow/'+out.workflows.image
     };
     for(const c of cases)d.run('INSERT INTO project_test_cases(project_id,test_id,definition) VALUES(?,?,?) ON CONFLICT(project_id,test_id) DO UPDATE SET definition=excluded.definition',out.project_id,c.id,JSON.stringify({...c,entry_path:entries[c.id]}));
     out.case_ids=cases.map(c=>c.id);out.name=d.one('SELECT name FROM projects WHERE id=?',out.project_id).name;

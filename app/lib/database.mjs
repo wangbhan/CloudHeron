@@ -1,4 +1,5 @@
 import {DatabaseSync} from 'node:sqlite';
+import {librarySchema} from './workflow-library.mjs';
 import {manualCaseSchema} from './manual-fixtures.mjs';
 import {mkdirSync, existsSync, readFileSync, writeFileSync, chmodSync} from 'node:fs';
 import {join} from 'node:path';
@@ -27,6 +28,8 @@ export function database(dir) {
     CREATE INDEX IF NOT EXISTS assets_project ON assets(project_id);
     CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);`);
   db.exec(manualCaseSchema);
+  db.exec(librarySchema);
+  db.exec("INSERT OR IGNORE INTO workflow_versions(workflow_id,revision,document,action,saved_at) SELECT id,revision,document,'baseline',updated_at FROM workflows");
   const one=(sql,...args)=>db.prepare(sql).get(...args),all=(sql,...args)=>db.prepare(sql).all(...args),run=(sql,...args)=>db.prepare(sql).run(...args);
   const tx=fn=>{db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
   run("UPDATE jobs SET status='failed',error='服务重启中断任务，请检查当前产物后重新运行',updated_at=? WHERE status IN ('queued','running')",new Date().toISOString());

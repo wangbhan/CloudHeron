@@ -1,7 +1,7 @@
 # 云鹭接口与工作流契约
 
 文档编号：DOC-DEV-003  
-版本：v0.1.1
+版本：v0.1.4
 日期：2026-10-01  
 关联：DEV-007 / 008 / 009 / 010，REQ-006 / 009 / 010 / 021
 
@@ -93,3 +93,19 @@ Skill task 新增 prompt，all 适用于全部 Agent。专家 task 为 image、v
 ## v0.1.3 参考与 Skill 修订
 
 参考资产节点的输出类型为 reference，可连接图片、视频生成和产物输出。视频生成也接受视频生成节点的 video 输出作为参考。资产 MIME 决定实际类型；图片生成遇视频输入时明确报错。视频文件输入需要 video_reference 能力，具体模型字段见 app/README.md。Skill 任务标签不限制选择，后台校验编号存在、最多 20 项及专家组合去重。
+
+## v0.1.4 模板和历史接口
+
+关联 DEV-018/019，REQ-006/007/009/010。模板和历史 JSON 均继承来源项目读取权限；创建副本还要求目标项目编辑权限。
+
+| 路径 | 方法 | 输入和结果 |
+| --- | --- | --- |
+| /api/workflow-templates | GET | 内置及授权项目模板元数据，不返回完整 JSON |
+| /api/workflow-templates | POST | {workflow_id,revision,name,description?}，固定已保存工作流快照 |
+| /api/workflow-templates/{id} | GET | 授权模板详情及 JSON |
+| /api/workflow-templates/{id}/instantiate | POST | {project_id,name,revision,keep_bindings?}，201 独立工作流 |
+| /api/workflows/{id}/versions | GET | 按 revision 降序的时间、操作者、来源及恢复源 |
+| /api/workflows/{id}/versions/{revision} | GET | 历史固定 JSON |
+| /api/workflows/{id}/restore | POST | {revision,source_revision}，保存成新 revision |
+
+keep_bindings 默认 false，清空 model_id/asset_id；true 时重新验证引用。revision 表示客户端看到的当前版本，冲突返回 409。保存、复用、恢复均不创建生成任务。恢复不覆盖原历史或发布快照。升级时仅登记已有工作流当前 revision，actor_id 为空、action 为 baseline。后续来源为 create、save、ai_modify、template、restore；恢复带 source_revision。

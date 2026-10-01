@@ -7,6 +7,7 @@ import {id,token,hash,password,verify,vault,permission,roles} from './lib/securi
 import {validateWorkflow,template,nodeTypes,executeWorkflow} from './lib/workflow.mjs';
 import {provider,validateModel} from './lib/provider.mjs';
 import {agents,normalizeChatConfig} from './lib/agents.mjs';
+import {builtinTemplates,copyTemplate} from './lib/workflow-library.mjs';
 import {seedManualWorkspace} from './lib/manual-fixtures.mjs';
 
 const root=dirname(fileURLToPath(import.meta.url));
@@ -42,6 +43,11 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
   const assetView=a=>({...a,metadata:parse(a.metadata),url:'/api/assets/'+a.id+'/media'});
   const jobView=j=>({...j,snapshot:undefined,steps:parse(j.steps),outputs:parse(j.outputs)});
   const wfView=w=>({...w,document:parse(w.document)});
+  const recordVersion=(w,u,action,sourceRevision=null)=>d.run('INSERT INTO workflow_versions(workflow_id,revision,document,actor_id,action,source_revision,saved_at) VALUES(?,?,?,?,?,?,?)',w.id,w.revision,w.document,u?.id||null,action,sourceRevision,w.updated_at);
+  const createWorkflow=(u,pid,name,document,action='create')=>d.tx(()=>{const wid=id('wf');d.run('INSERT INTO workflows(id,project_id,name,document,updated_at) VALUES(?,?,?,?,?)',wid,pid,name,json({...document,name}),now());const w=d.one('SELECT * FROM workflows WHERE id=?',wid);recordVersion(w,u,action);return w;});
+  const storeWorkflow=(w,u,revision,document,action,sourceRevision=null)=>d.tx(()=>{const name=text(document.name||w.name,'工作流名称');const changed=d.run('UPDATE workflows SET name=?,document=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?',name,json(document),now(),w.id,revision);if(!changed.changes)fail(409,'工作流已被他人修改，请刷新后重试');const saved=d.one('SELECT * FROM workflows WHERE id=?',w.id);recordVersion(saved,u,action,sourceRevision);return saved;});
+  const templateResource=(u,tid)=>builtinTemplates.find(t=>t.id===tid)||resource('workflow_templates',u,tid);
+  const templateView=(t,detail=false)=>{const doc=parse(t.document);return {...t,builtin:!!t.builtin,document:detail?doc:undefined,node_count:doc.nodes.length,edge_count:doc.edges.length};};
   const wfResources=(u,w)=>{validateWorkflow(w);for(const n of w.nodes){if(n.type==='reference_asset'&&n.params.asset_id)asset(u,n.params.asset_id);if(n.params.model_id)model(n.params.model_id);}};
   const applySkills=(kind,prompt,ids=[],target=kind)=>{if(!Array.isArray(ids)||ids.length>20)throw Error('Skill 列表有误');for(const sid of new Set(ids)){const s=d.one('SELECT * FROM skills WHERE id=?',sid);if(!s)throw Error('Skill 不存在');prompt=s.template.replaceAll('{{prompt}}',prompt);}return prompt;};
   async function saveAsset(data,kind,mime,job) {
@@ -140,11 +146,41 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
       if((m=path.match(/^\/api\/projects\/([^/]+)$/))&&method==='PATCH'){const p=project(u,m[1],true);if(u.role!=='admin'&&p.owner_id!==u.id)fail(403,'仅管理员或项目创建者可管理共享设置');const b=await body(req);if(!['team','private'].includes(b.visibility)||!b.acl||typeof b.acl!=='object'||Array.isArray(b.acl))fail(400,'共享配置有误');for(const [uid,level]of Object.entries(b.acl))if(!['read','edit'].includes(level)||!d.one('SELECT id FROM users WHERE id=?',uid))fail(400,'授权成员或权限有误');d.run('UPDATE projects SET name=?,visibility=?,acl=? WHERE id=?',text(b.name,'项目名称'),b.visibility,json(b.acl),p.id);send(res,{ok:true});return;}
       if((m=path.match(/^\/api\/projects\/([^/]+)\/contents$/))&&method==='GET'){project(u,m[1]);const get=(table,source)=>d.all(`SELECT * FROM ${table} WHERE project_id=? ORDER BY updated_at DESC`,m[1]).map(r=>{const j=d.one('SELECT * FROM jobs WHERE source_id=? ORDER BY created_at DESC LIMIT 1',r.id);return {id:r.id,project_id:r.project_id,source,title:r.name||r.title,status:j?.status||'draft',outputs:j?parse(j.outputs):[]};});send(res,[...get('chats','chat'),...get('workflows','workflow')]);return;}
       if((m=path.match(/^\/api\/projects\/([^/]+)\/test-cases$/))&&method==='GET'){project(u,m[1]);send(res,d.all('SELECT definition FROM project_test_cases WHERE project_id=? ORDER BY test_id',m[1]).map(x=>parse(x.definition)));return;}
+      if(path==='/api/workflow-templates'&&method==='GET'){
+        const saved=d.all('SELECT * FROM workflow_templates ORDER BY updated_at DESC').filter(t=>permission(u,d.one('SELECT * FROM projects WHERE id=?',t.project_id)));
+        send(res,[...builtinTemplates,...saved].map(t=>templateView(t)));return;
+      }
+      if(path==='/api/workflow-templates'&&method==='POST'){
+        editor(u);const b=await body(req),w=resource('workflows',u,b.workflow_id,true);
+        if(b.revision!==w.revision)fail(409,'工作流已更新，请刷新后再保存模板');
+        const tid=id('tpl'),description=b.description===undefined?'':String(b.description).trim();if(description.length>2000)fail(400,'模板描述最多 2000 字');
+        d.run('INSERT INTO workflow_templates(id,project_id,owner_id,name,description,document,source_workflow_id,source_revision,updated_at) VALUES(?,?,?,?,?,?,?,?,?)',tid,w.project_id,u.id,text(b.name,'模板名称'),description,w.document,w.id,w.revision,now());
+        send(res,templateView(d.one('SELECT * FROM workflow_templates WHERE id=?',tid),true),201);return;
+      }
+      if((m=path.match(/^\/api\/workflow-templates\/([^/]+)$/))&&method==='GET'){send(res,templateView(templateResource(u,m[1]),true));return;}
+      if((m=path.match(/^\/api\/workflow-templates\/([^/]+)\/instantiate$/))&&method==='POST'){
+        editor(u);const t=templateResource(u,m[1]),b=await body(req);project(u,b.project_id,true);
+        if(b.revision!==t.revision)fail(409,'模板版本已变化，请重新打开模板');
+        if(b.keep_bindings!==undefined&&typeof b.keep_bindings!=='boolean')fail(400,'保留配置须为布尔值');
+        const name=text(b.name,'工作流名称'),doc=copyTemplate(parse(t.document),name,{keepBindings:b.keep_bindings===true});wfResources(u,doc);
+        send(res,wfView(createWorkflow(u,b.project_id,name,doc,'template')),201);return;
+      }
+      if((m=path.match(/^\/api\/workflows\/([^/]+)\/versions$/))&&method==='GET'){
+        resource('workflows',u,m[1]);send(res,d.all('SELECT v.revision,v.actor_id,v.action,v.source_revision,v.saved_at,users.name AS actor_name FROM workflow_versions v LEFT JOIN users ON users.id=v.actor_id WHERE v.workflow_id=? ORDER BY v.revision DESC',m[1]));return;
+      }
+      if((m=path.match(/^\/api\/workflows\/([^/]+)\/versions\/(\d+)$/))&&method==='GET'){
+        resource('workflows',u,m[1]);const v=d.one('SELECT * FROM workflow_versions WHERE workflow_id=? AND revision=?',m[1],Number(m[2]));if(!v)fail(404,'该历史版本不存在');send(res,{...v,document:parse(v.document)});return;
+      }
+      if((m=path.match(/^\/api\/workflows\/([^/]+)\/restore$/))&&method==='POST'){
+        const w=resource('workflows',u,m[1],true),b=await body(req);if(!Number.isSafeInteger(b.source_revision)||b.source_revision<1)fail(400,'请选择有效历史版本');
+        const v=d.one('SELECT * FROM workflow_versions WHERE workflow_id=? AND revision=?',w.id,b.source_revision);if(!v)fail(404,'该历史版本不存在');
+        const doc=parse(v.document);wfResources(u,doc);send(res,wfView(storeWorkflow(w,u,b.revision,doc,'restore',v.revision)));return;
+      }
       if(path==='/api/workflows/validate'&&method==='POST'){editor(u);const b=await body(req);project(u,b.project_id,true);wfResources(u,b.document);send(res,{ok:true});return;}
       if(path==='/api/workflows'&&method==='GET'){send(res,d.all('SELECT * FROM workflows ORDER BY updated_at DESC').filter(w=>{const p=d.one('SELECT * FROM projects WHERE id=?',w.project_id);return permission(u,p);}).map(wfView));return;}
-      if(path==='/api/workflows'&&method==='POST'){editor(u);const b=await body(req);project(u,b.project_id,true);const name=text(b.name,'工作流名称'),w=b.document||template(name);wfResources(u,w);const wid=id('wf');d.run('INSERT INTO workflows(id,project_id,name,document,updated_at) VALUES(?,?,?,?,?)',wid,b.project_id,name,json({...w,name}),now());send(res,wfView(d.one('SELECT * FROM workflows WHERE id=?',wid)),201);return;}
+      if(path==='/api/workflows'&&method==='POST'){editor(u);const b=await body(req);project(u,b.project_id,true);const name=text(b.name,'工作流名称'),w=b.document||template(name);wfResources(u,w);send(res,wfView(createWorkflow(u,b.project_id,name,w)),201);return;}
       if((m=path.match(/^\/api\/workflows\/([^/]+)$/))&&method==='GET'){const w=resource('workflows',u,m[1]);send(res,{...wfView(w),can_edit:permission(u,d.one('SELECT * FROM projects WHERE id=?',w.project_id),true),job:jobViewOrNull(d.one('SELECT * FROM jobs WHERE source_id=? ORDER BY created_at DESC LIMIT 1',w.id))});return;}
-      if((m=path.match(/^\/api\/workflows\/([^/]+)$/))&&method==='PUT'){const w=resource('workflows',u,m[1],true),b=await body(req);wfResources(u,b.document);const name=text(b.document.name||w.name,'工作流名称');const changed=d.run('UPDATE workflows SET name=?,document=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?',name,json(b.document),now(),w.id,b.revision);if(!changed.changes)fail(409,'工作流已被他人修改，请刷新后重试');send(res,wfView(d.one('SELECT * FROM workflows WHERE id=?',w.id)));return;}
+      if((m=path.match(/^\/api\/workflows\/([^/]+)$/))&&method==='PUT'){const w=resource('workflows',u,m[1],true),b=await body(req);wfResources(u,b.document);send(res,wfView(storeWorkflow(w,u,b.revision,b.document,'save')));return;}
       if((m=path.match(/^\/api\/workflows\/([^/]+)\/run$/))&&method==='POST'){const w=resource('workflows',u,m[1],true),b=await body(req);if(b.revision!==w.revision)fail(409,'请保存或刷新当前工作流再运行');const document=parse(w.document);validateWorkflow(document);send(res,enqueue(u,{project_id:w.project_id,source:'workflow',source_id:w.id,snapshot:{document,input:{}}}),202);return;}
       if((m=path.match(/^\/api\/workflows\/([^/]+)\/assist$/))&&method==='POST'){
         const w=resource('workflows',u,m[1],true),b=await body(req);if(!['analyze','modify'].includes(b.mode))fail(400,'请选择分析或修改');const prompt=text(b.prompt,'对话内容',10000),api=adapters(null);
@@ -157,7 +193,7 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
       }
       if((m=path.match(/^\/api\/proposals\/([^/]+)\/confirm$/))&&method==='POST'){
         const p=d.one('SELECT * FROM proposals WHERE id=? AND user_id=?',m[1],u.id);if(!p||p.status!=='pending'||p.expires<Date.now())fail(409,'提案已失效，请重新请求修改');resource('workflows',u,p.workflow_id,true);wfResources(u,parse(p.document));
-        d.tx(()=>{const result=d.run('UPDATE workflows SET document=?,name=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?',p.document,text(parse(p.document).name||'工作流','名称'),now(),p.workflow_id,p.base_revision);if(!result.changes)fail(409,'工作流已改变，提案未应用，请重新请求修改');d.run("UPDATE proposals SET status='confirmed' WHERE id=?",p.id);});send(res,wfView(d.one('SELECT * FROM workflows WHERE id=?',p.workflow_id)));return;
+        d.tx(()=>{const result=d.run('UPDATE workflows SET document=?,name=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?',p.document,text(parse(p.document).name||'工作流','名称'),now(),p.workflow_id,p.base_revision);if(!result.changes)fail(409,'工作流已改变，提案未应用，请重新请求修改');recordVersion(d.one('SELECT * FROM workflows WHERE id=?',p.workflow_id),u,'ai_modify');d.run("UPDATE proposals SET status='confirmed' WHERE id=?",p.id);});send(res,wfView(d.one('SELECT * FROM workflows WHERE id=?',p.workflow_id)));return;
       }
       if(path==='/api/chats'&&method==='GET'){send(res,d.all('SELECT * FROM chats ORDER BY updated_at DESC').filter(c=>permission(u,d.one('SELECT * FROM projects WHERE id=?',c.project_id))).map(c=>({...c,messages:undefined})));return;}
       if(path==='/api/chats'&&method==='POST'){const b=await body(req);project(u,b.project_id,true);const cid=id('chat');d.run('INSERT INTO chats(id,project_id,title,updated_at) VALUES(?,?,?,?)',cid,b.project_id,text(b.title,'对话名称'),now());send(res,d.one('SELECT * FROM chats WHERE id=?',cid),201);return;}

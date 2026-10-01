@@ -65,7 +65,7 @@ test('真实 HTTP 与 SQLite 集成（上游仅为测试夹具）',async t=>{
       const r=await call('workflows/'+wf.id+'/assist','POST',{mode:'modify',model_id:modelId,prompt:'改成晨曦'});assert.equal(r.status,200);
       assert.equal((await call('workflows/'+wf.id)).body.document.nodes[0].params.prompt,'雨夜');
       const confirmed=await call('proposals/'+r.body.id+'/confirm','POST',{});assert.equal(confirmed.status,200);wf=confirmed.body;
-      assert.equal(wf.document.nodes[0].params.prompt,'晨曦');assert.equal(app.db.one('SELECT COUNT(*) n FROM jobs').n,before);assert.equal(generateCalls,calls);
+      assert.equal(wf.document.nodes[0].params.prompt,'晨曦');assert.equal(app.db.one('SELECT COUNT(*) n FROM jobs').n,before);assert.equal(generateCalls,calls);const versions=(await call('workflows/'+wf.id+'/versions')).body;assert.equal(versions[0].action,'ai_modify');assert.equal(versions.length,wf.revision);assert.equal((await call('workflows/'+wf.id+'/versions/'+wf.revision)).body.document.nodes[0].params.prompt,'晨曦');
       assert.equal((await call('proposals/'+r.body.id+'/confirm','POST',{})).status,409);
       const stale=await call('workflows/'+wf.id+'/assist','POST',{mode:'modify',model_id:modelId,prompt:'修改'});wf=(await call('workflows/'+wf.id,'PUT',{revision:wf.revision,document:wf.document})).body;assert.equal((await call('proposals/'+stale.body.id+'/confirm','POST',{})).status,409);
     });
@@ -111,7 +111,7 @@ test('真实 HTTP 与 SQLite 集成（上游仅为测试夹具）',async t=>{
     await t.test('手动测试工作区幂等，示例不执行模型，查看者不能载入',async()=>{
       const jobs=app.db.one('SELECT COUNT(*) n FROM jobs').n,calls=generateCalls;
       const a=await call('test-workspace','POST',{},editorCookie),b=await call('test-workspace','POST',{},editorCookie);
-      assert.equal(a.status,200);assert.deepEqual(a.body,b.body);assert.equal(Object.keys(a.body.workflows).length,4);assert.equal(Object.keys(a.body.chats).length,3);assert.equal(a.body.assets.length,2);const cases=await call('projects/'+a.body.project_id+'/test-cases','GET',undefined,editorCookie);assert.equal(cases.status,200);assert.equal(cases.body.length,23);assert.equal(cases.body.find(c=>c.id==='TST-009').entry_path,'#workflow/'+a.body.workflows.error);const isolated=app.db.one('SELECT id FROM projects WHERE owner_id=? AND visibility=?',editorId,'private');assert.equal((await call('projects/'+isolated.id+'/test-cases','GET',undefined,viewerCookie)).status,403);
+      assert.equal(a.status,200);assert.deepEqual(a.body,b.body);assert.equal(Object.keys(a.body.workflows).length,4);assert.equal(Object.keys(a.body.chats).length,3);assert.equal(a.body.assets.length,2);const cases=await call('projects/'+a.body.project_id+'/test-cases','GET',undefined,editorCookie);assert.equal(cases.status,200);assert.equal(cases.body.length,27);assert.equal(cases.body.find(c=>c.id==='TST-009').entry_path,'#workflow/'+a.body.workflows.error);const isolated=app.db.one('SELECT id FROM projects WHERE owner_id=? AND visibility=?',editorId,'private');assert.equal((await call('projects/'+isolated.id+'/test-cases','GET',undefined,viewerCookie)).status,403);
       assert.equal(app.db.one('SELECT COUNT(*) n FROM jobs').n,jobs);assert.equal(generateCalls,calls);assert.equal((await call('test-workspace','POST',{},viewerCookie)).status,403);
       const missing=await call('workflows/'+a.body.workflows.image+'/run','POST',{revision:1},editorCookie);const j=await done(missing.body.id);assert.equal(j.status,'failed');assert.equal(j.steps.image.status,'failed');assert.match(j.error,/模型/);
     });
