@@ -1,3 +1,4 @@
+import {requestOptions,validateReferenceField} from './api-options.mjs';
 import {lookup} from 'node:dns/promises';
 import {isIP} from 'node:net';
 const PRIVATE=/^(127\.|10\.|192\.168\.|169\.254\.|0\.|172\.(1[6-9]|2\d|3[01])\.)/;
@@ -11,7 +12,7 @@ export function validateModel(spec) {
   if(typeof spec.model!=='string'||!spec.model.trim())throw Error('请输入上游模型名称');
   if(spec.capabilities.includes('video_reference')&&!spec.capabilities.includes('video'))throw Error('参考视频能力需要同时启用视频能力');
   if(spec.video_format&&!['multipart','json'].includes(spec.video_format))throw Error('视频请求格式有误');
-  if(spec.reference_fields){if(typeof spec.reference_fields!=='object'||Array.isArray(spec.reference_fields)||Object.keys(spec.reference_fields).some(k=>!['image','video'].includes(k))||Object.values(spec.reference_fields).some(v=>typeof v!=='string'||!/^[-a-zA-Z0-9_\[\]]{1,80}$/.test(v)||['model','prompt','size','seconds','seed'].includes(v)))throw Error('参考字段须为 image/video 对应的独立字段名');}
+  if(spec.reference_fields){if(typeof spec.reference_fields!=='object'||Array.isArray(spec.reference_fields)||Object.keys(spec.reference_fields).some(k=>!['image','video'].includes(k))||Object.values(spec.reference_fields).some(v=>!validateReferenceField(v)))throw Error('参考字段须为 image/video 对应的独立字段名');}
   if(spec.format&&!['multipart','json'].includes(spec.format))throw Error('请求格式有误');
   for(const value of Object.values(spec.paths||{}))if(typeof value!=='string'||!/^\/[a-zA-Z0-9_\-/{}/]+$/.test(value)||value.includes('..'))throw Error('接口路径须为 / 开头的相对路径');
   if(spec.extra&&(typeof spec.extra!=='object'||Array.isArray(spec.extra)))throw Error('附加参数须为 JSON 对象');
@@ -35,9 +36,9 @@ export function provider({secret,loadMedia,saveMedia,pollMs=2500}) {
     if(raw)return {data:await limited(r,100*1024*1024),mime:r.headers.get('content-type')?.split(';')[0]||'application/octet-stream'};
     const data=await limited(r,32*1024*1024);try{return JSON.parse(data);}catch{throw Error('模型未返回有效 JSON，请检查接口路径与请求格式');}
   }
-  async function chat(model,messages) {
+  async function chat(model,messages,params={}) {
     const spec=JSON.parse(model.spec);if(!spec.capabilities.includes('text'))throw Error('所选模型未启用文本能力');
-    const data=await request(model,spec.paths?.text||'/chat/completions',{method:'POST',body:{...spec.extra,model:spec.model,messages,stream:false}});
+    const data=await request(model,spec.paths?.text||'/chat/completions',{method:'POST',body:{...requestOptions('text',params,spec),model:spec.model,messages,stream:false}});
     const content=data.choices?.[0]?.message?.content;if(typeof content!=='string'||!content.trim())throw Error('文本模型响应缺少 choices[0].message.content');return content;
   }
   async function download(model,value,kind) {
@@ -59,7 +60,7 @@ export function provider({secret,loadMedia,saveMedia,pollMs=2500}) {
     if(kind==='video'&&refs.some(a=>a.mime.startsWith('video/'))&&!spec.capabilities.includes('video_reference'))throw Error('所选模型未启用参考视频能力，请配置支持视频输入的模型并启用该能力');
     if(kind==='image'&&refs.length&&!spec.capabilities.includes('image_edit'))throw Error('所选图片模型未启用参考图片／编辑能力');
     let path=kind==='video'?(spec.paths?.video||'/videos'):(refs.length?spec.paths?.edit||'/images/edits':spec.paths?.image||'/images/generations');
-    const values={...spec.extra,model:spec.model,prompt};if(params.size)values.size=params.size;
+    const values={...requestOptions(kind,params,spec),model:spec.model,prompt};if(params.size)values.size=params.size;
     if(kind==='video')values.seconds=String(params.seconds||4);
     if(params.seed!==undefined&&params.seed!=='')values.seed=Number(params.seed);
     let body=values;

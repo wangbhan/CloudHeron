@@ -1,7 +1,7 @@
 # 云鹭接口与工作流契约
 
 文档编号：DOC-DEV-003  
-版本：v0.1.4
+版本：v0.1.5
 日期：2026-10-01  
 关联：DEV-007 / 008 / 009 / 010，REQ-006 / 009 / 010 / 021
 
@@ -109,3 +109,9 @@ Skill task 新增 prompt，all 适用于全部 Agent。专家 task 为 image、v
 | /api/workflows/{id}/restore | POST | {revision,source_revision}，保存成新 revision |
 
 keep_bindings 默认 false，清空 model_id/asset_id；true 时重新验证引用。revision 表示客户端看到的当前版本，冲突返回 409。保存、复用、恢复均不创建生成任务。恢复不覆盖原历史或发布快照。升级时仅登记已有工作流当前 revision，actor_id 为空、action 为 baseline。后续来源为 create、save、ai_modify、template、restore；恢复带 source_revision。
+
+## v0.1.5 任务级 API 参数
+
+GET /api/task-options 返回 image/video/text 的字段 schema（需登录）。工作流生成节点 params 和对话 config 可携带该任务的直接字段以及 api_params 对象；媒体对话的 text_options 用于辅助文本模型。工作流 assist 请求新增 params 对象用于文本参数。完整字段和类型见 DOC-DEV-007。
+
+未填省略；模型 extra、api_params、任务显式参数、平台输入依次覆盖。JSON 保留类型，multipart 标量为文本，对象/数组为 JSON 文本。非法参数在保存或创建任务前拒绝；实际模型不支持时按原任务错误路径展示。

@@ -1,7 +1,8 @@
+import {normalizeApiOptions,taskOptions} from './api-options.mjs';
 export const agents = [
-  {id:'image',name:'图片 Agent',description:'组织画面与参考图，调用图片模型。',model_capability:'image',fields:['model_id','text_model_id','asset_ids','expert_id','skill_ids','size','seed'],defaults:{size:'1024x1024'}},
-  {id:'video',name:'视频 Agent',description:'组织动作与运镜，调用视频模型。',model_capability:'video',fields:['model_id','text_model_id','asset_ids','expert_id','skill_ids','size','seconds','seed'],defaults:{size:'1280x720',seconds:4}},
-  {id:'prompt',name:'提示词 Agent',description:'整理图片或视频提示词，返回文字。',model_capability:'text',fields:['model_id','kind','expert_id','skill_ids'],defaults:{kind:'image'}}
+  {id:'image',name:'图片 Agent',description:'组织画面与参考图，调用图片模型。',model_capability:'image',fields:['model_id','text_model_id','asset_ids','expert_id','skill_ids','size','seed','text_options','api_params',...taskOptions.image.map(f=>f.key)],defaults:{size:'1024x1024'}},
+  {id:'video',name:'视频 Agent',description:'组织动作与运镜，调用视频模型。',model_capability:'video',fields:['model_id','text_model_id','asset_ids','expert_id','skill_ids','size','seconds','seed','text_options','api_params',...taskOptions.video.map(f=>f.key)],defaults:{size:'1280x720',seconds:4}},
+  {id:'prompt',name:'提示词 Agent',description:'整理图片或视频提示词，返回文字。',model_capability:'text',fields:['model_id','kind','expert_id','skill_ids','api_params',...taskOptions.text.map(f=>f.key)],defaults:{kind:'image'}}
 ];
 
 
@@ -37,5 +38,7 @@ export function normalizeChatConfig(raw, {getModel,getSkill,getExpert}) {
   cfg.skill_ids=[...new Set([...ordered,...additional])];
   if(cfg.skill_ids.length>20)throw Error('专家与附加 Skill 合计最多 20 项');
   for(const sid of cfg.skill_ids){const s=getSkill(sid);if(!s)throw Error('Skill 不存在');}
+  Object.assign(cfg,normalizeApiOptions(agent.model_capability,raw,{referenceFields:Object.values(JSON.parse(model.spec).reference_fields||{})}));
+  if(cfg.text_model_id)cfg.text_options=normalizeApiOptions('text',raw.text_options||{});
   return cfg;
 }

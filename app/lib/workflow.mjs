@@ -1,3 +1,4 @@
+import {normalizeApiOptions} from './api-options.mjs';
 export const nodeTypes={prompt_input:{name:'提示词输入',output:'text'},reference_asset:{name:'参考资产',output:'reference'},prompt_agent:{name:'提示词 Agent',output:'text'},image_generate:{name:'图片生成',output:'image'},video_generate:{name:'视频生成',output:'video'},media_output:{name:'产物输出',output:'media'}};
 export function validateWorkflow(w) {
   if(!w||w.schema_version!=='1.0'||!Array.isArray(w.nodes)||!Array.isArray(w.edges)||w.nodes.length<1||w.nodes.length>100||w.edges.length>300)throw Error('工作流须为 schema_version 1.0，包含 1–100 个节点与最多 300 条连线');
@@ -10,6 +11,7 @@ export function validateWorkflow(w) {
     if(n.params.seconds!==undefined&&(!Number.isFinite(n.params.seconds)||n.params.seconds<1||n.params.seconds>120))throw Error('视频时长须为 1–120 秒');
     if(n.params.seed!==undefined&&n.params.seed!==''&&!Number.isSafeInteger(n.params.seed))throw Error('随机种子须为有效整数');
     if(n.params.skill_ids&&(!Array.isArray(n.params.skill_ids)||n.params.skill_ids.length>20))throw Error('Skill 参数须为数组，最多 20 项');
+    if(['prompt_agent','image_generate','video_generate'].includes(n.type))normalizeApiOptions(n.type==='prompt_agent'?'text':n.type==='image_generate'?'image':'video',n.params);
     nodes.set(n.id,n);
   }
   const keys=new Set(),degree=new Map(w.nodes.map(n=>[n.id,0]));

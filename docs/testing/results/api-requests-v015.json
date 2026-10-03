@@ -1,0 +1,81 @@
+[
+  {
+    "path": "/v1/images/generations",
+    "body": {
+      "watermark": false,
+      "scheduler": "euler",
+      "n": 2,
+      "quality": "high",
+      "guidance_scale": 0,
+      "model": "qa-fixture",
+      "prompt": "白鹭飞过云海，柔和晨光，远处青山",
+      "size": "1024x1024"
+    }
+  },
+  {
+    "path": "/v1/images/generations",
+    "body": {
+      "watermark": false,
+      "custom_flag": true,
+      "n": 2,
+      "quality": "medium",
+      "model": "qa-fixture",
+      "prompt": "保持参考资产的外观、服装与风格。主体、环境、光线与构图：两张晨光测试图片，仅为夹具",
+      "size": "1024x1024"
+    }
+  },
+  {
+    "path": "/v1/chat/completions",
+    "body": {
+      "watermark": true,
+      "temperature": 0,
+      "max_tokens": 64,
+      "stop": [
+        "END"
+      ],
+      "model": "qa-fixture",
+      "messages": [
+        {
+          "role": "system",
+          "content": "你是云鹭提示词 Agent，结合对话上下文整理图片或视频提示词，只回复可用的提示词。"
+        },
+        {
+          "role": "user",
+          "content": "两张晨光测试图片，仅为夹具"
+        },
+        {
+          "role": "assistant",
+          "content": "图片已生成。"
+        },
+        {
+          "role": "user",
+          "content": "整理文本参数测试"
+        }
+      ],
+      "stream": false
+    }
+  },
+  {
+    "path": "/v1/videos",
+    "body": {
+      "watermark": false,
+      "nested": {
+        "mode": "fast"
+      },
+      "labels": [
+        "qa"
+      ],
+      "fps": 24,
+      "aspect_ratio": "16:9",
+      "guidance_scale": 0,
+      "model": "qa-fixture",
+      "prompt": "保持参考资产的外观、服装与风格。明确主体动作与运镜，避免无关切换：视频参数测试，仅为夹具",
+      "size": "1280x720",
+      "seconds": "4"
+    }
+  },
+  {
+    "path": "/v1/videos/fixture/content",
+    "body": {}
+  }
+]

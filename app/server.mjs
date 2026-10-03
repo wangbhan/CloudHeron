@@ -1,3 +1,4 @@
+import {taskOptions,normalizeApiOptions} from './lib/api-options.mjs';
 import http from 'node:http';
 import {readFile,writeFile,stat} from 'node:fs/promises';
 import {join,resolve,dirname,extname} from 'node:path';
@@ -48,7 +49,7 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
   const storeWorkflow=(w,u,revision,document,action,sourceRevision=null)=>d.tx(()=>{const name=text(document.name||w.name,'工作流名称');const changed=d.run('UPDATE workflows SET name=?,document=?,revision=revision+1,updated_at=? WHERE id=? AND revision=?',name,json(document),now(),w.id,revision);if(!changed.changes)fail(409,'工作流已被他人修改，请刷新后重试');const saved=d.one('SELECT * FROM workflows WHERE id=?',w.id);recordVersion(saved,u,action,sourceRevision);return saved;});
   const templateResource=(u,tid)=>builtinTemplates.find(t=>t.id===tid)||resource('workflow_templates',u,tid);
   const templateView=(t,detail=false)=>{const doc=parse(t.document);return {...t,builtin:!!t.builtin,document:detail?doc:undefined,node_count:doc.nodes.length,edge_count:doc.edges.length};};
-  const wfResources=(u,w)=>{validateWorkflow(w);for(const n of w.nodes){if(n.type==='reference_asset'&&n.params.asset_id)asset(u,n.params.asset_id);if(n.params.model_id)model(n.params.model_id);}};
+  const wfResources=(u,w)=>{validateWorkflow(w);for(const n of w.nodes){if(n.type==='reference_asset'&&n.params.asset_id)asset(u,n.params.asset_id);if(n.params.model_id){const m=model(n.params.model_id);if(['prompt_agent','image_generate','video_generate'].includes(n.type))normalizeApiOptions(n.type==='prompt_agent'?'text':n.type==='image_generate'?'image':'video',n.params,{referenceFields:Object.values(parse(m.spec).reference_fields||{})});}}};
   const applySkills=(kind,prompt,ids=[],target=kind)=>{if(!Array.isArray(ids)||ids.length>20)throw Error('Skill 列表有误');for(const sid of new Set(ids)){const s=d.one('SELECT * FROM skills WHERE id=?',sid);if(!s)throw Error('Skill 不存在');prompt=s.template.replaceAll('{{prompt}}',prompt);}return prompt;};
   async function saveAsset(data,kind,mime,job) {
     const supported=kind==='image'?['image/png','image/jpeg','image/webp','image/gif']:['video/mp4','video/webm'];
@@ -79,16 +80,16 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
         const refs=(config.asset_ids||[]).map(a=>asset(principal(),a));
         const history=snap.messages.filter(m=>['user','assistant'].includes(m.role)&&m.text).slice(-20).map(m=>({role:m.role,content:m.text}));
         let result;
-        if(config.agent==='prompt')result=await api.chat(model(config.model_id),[{role:'system',content:'你是云鹭提示词 Agent，结合对话上下文整理图片或视频提示词，只回复可用的提示词。'},...history.slice(0,-1),{role:'user',content:applySkills('prompt',snap.prompt,config.skill_ids||[],config.kind)}]);
+        if(config.agent==='prompt')result=await api.chat(model(config.model_id),[{role:'system',content:'你是云鹭提示词 Agent，结合对话上下文整理图片或视频提示词，只回复可用的提示词。'},...history.slice(0,-1),{role:'user',content:applySkills('prompt',snap.prompt,config.skill_ids||[],config.kind)}],config);
         else {
           let prompt=snap.prompt;
-          if(config.text_model_id)prompt=await api.chat(model(config.text_model_id),[{role:'system',content:'你是云鹭创作 Agent。结合创作历史，将用户要求整理为一段可直接传入生成模型的画面或动作提示词。只回复提示词。'},...history]);
+          if(config.text_model_id)prompt=await api.chat(model(config.text_model_id),[{role:'system',content:'你是云鹭创作 Agent。结合创作历史，将用户要求整理为一段可直接传入生成模型的画面或动作提示词。只回复提示词。'},...history],config.text_options||{});
           else if(history.length>1)prompt=history.map(m=>m.role+': '+m.content).join('\n');
           outputs=await generate(config.kind,config.model_id,prompt,refs,config);result=(config.kind==='image'?'图片':'视频')+'已生成。';
         }
         await onStep('agent','completed');
         d.tx(()=>{const c=d.one('SELECT messages FROM chats WHERE id=?',j.source_id);const messages=parse(c.messages);messages.push({id:id('msg'),role:'assistant',text:result,outputs:outputs.map(a=>a.id),job_id:jid,at:now()});d.run('UPDATE chats SET messages=?,updated_at=? WHERE id=?',json(messages),now(),j.source_id);});
-      }else outputs=await executeWorkflow(snap.document,{input:snap.input,resolveAsset:aid=>asset(principal(),aid),generate,chat:(mid,prompt,params)=>api.chat(model(mid),[{role:'system',content:'你是云鹭提示词 Agent，整理可用提示词。'}, {role:'user',content:applySkills('prompt',prompt,params.skill_ids||[])}]),onStep});
+      }else outputs=await executeWorkflow(snap.document,{input:snap.input,resolveAsset:aid=>asset(principal(),aid),generate,chat:(mid,prompt,params)=>api.chat(model(mid),[{role:'system',content:'你是云鹭提示词 Agent，整理可用提示词。'}, {role:'user',content:applySkills('prompt',prompt,params.skill_ids||[])}],params),onStep});
       d.run("UPDATE jobs SET status='completed',outputs=?,updated_at=? WHERE id=?",json(outputs.map(a=>a.id)),now(),jid);
     }catch(e){d.run("UPDATE jobs SET status='failed',error=?,updated_at=? WHERE id=?",e.message.slice(0,500),now(),jid);if(j.source==='chat')d.tx(()=>{const c=d.one('SELECT messages FROM chats WHERE id=?',j.source_id);if(c){const messages=parse(c.messages);messages.push({id:id('msg'),role:'assistant',text:'生成失败：'+e.message.slice(0,500),job_id:jid,at:now()});d.run('UPDATE chats SET messages=?,updated_at=? WHERE id=?',json(messages),now(),j.source_id);}});}
   }
@@ -185,7 +186,7 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
       if((m=path.match(/^\/api\/workflows\/([^/]+)\/assist$/))&&method==='POST'){
         const w=resource('workflows',u,m[1],true),b=await body(req);if(!['analyze','modify'].includes(b.mode))fail(400,'请选择分析或修改');const prompt=text(b.prompt,'对话内容',10000),api=adapters(null);
         const instruction=b.mode==='analyze'?'仅分析工作流，说明问题与建议。禁止执行任务。':`你是工作流编辑助手。只返回 JSON 对象 {"explanation":"修改摘要","document":完整工作流JSON}。schema_version 为 1.0，节点类型限定 ${Object.keys(nodeTypes).join(',')}。保留已有模型和资产编号，完整返回所有节点与连线，不执行任何任务。`;
-        const result=await api.chat(model(b.model_id),[{role:'system',content:instruction},{role:'user',content:json({workflow:parse(w.document),request:prompt})}]);
+        const options=normalizeApiOptions('text',b.params||{});const result=await api.chat(model(b.model_id),[{role:'system',content:instruction},{role:'user',content:json({workflow:parse(w.document),request:prompt})}],options);
         if(b.mode==='analyze'){send(res,{analysis:result});return;}
         let proposal;try{proposal=JSON.parse(result.replace(/^```(?:json)?\s*/,'').replace(/\s*```$/,''));}catch{fail(422,'AI 返回格式有误，请重试；当前工作流保持原样');}
         wfResources(u,proposal.document);const pid=id('proposal');d.run('INSERT INTO proposals(id,workflow_id,user_id,base_revision,document,explanation,expires) VALUES(?,?,?,?,?,?,?)',pid,w.id,u.id,w.revision,json(proposal.document),text(proposal.explanation,'修改摘要',4000),Date.now()+3600000);
@@ -214,6 +215,7 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
       if(path==='/api/models'&&method==='POST'){admin(u);const b=await body(req),mid=id('model');validateModel(b.spec);d.run('INSERT INTO models(id,name,spec,secret,updated_at) VALUES(?,?,?,?,?)',mid,text(b.name,'配置名称'),json(b.spec),v.encrypt(String(b.api_key||'')),now());send(res,modelView(d.one('SELECT * FROM models WHERE id=?',mid),u),201);return;}
       if((m=path.match(/^\/api\/models\/([^/]+)$/))&&method==='PUT'){admin(u);const old=d.one('SELECT * FROM models WHERE id=?',m[1]);if(!old)fail(404,'模型不存在');const b=await body(req);validateModel(b.spec);d.run('UPDATE models SET name=?,spec=?,secret=?,enabled=?,updated_at=? WHERE id=?',text(b.name,'配置名称'),json(b.spec),b.api_key===undefined?old.secret:v.encrypt(String(b.api_key)),b.enabled===false?0:1,now(),old.id);send(res,modelView(d.one('SELECT * FROM models WHERE id=?',old.id),u));return;}
       if((m=path.match(/^\/api\/models\/([^/]+)\/check$/))&&method==='POST'){admin(u);const mod=model(m[1]);const result=await adapters(null).request(mod,parse(mod.spec).paths?.models||'/models');send(res,{ok:true,models:(result.data||[]).map(x=>x.id),note:'服务连接成功；生成能力以实际任务结果为准'});return;}
+      if(path==='/api/task-options'&&method==='GET'){send(res,taskOptions);return;}
       if(path==='/api/agents'&&method==='GET'){send(res,agents);return;}
       if(path==='/api/experts'&&method==='GET'){send(res,d.all('SELECT * FROM experts ORDER BY builtin DESC,name').map(x=>({...x,skill_ids:parse(x.skill_ids)})));return;}
       if((path==='/api/experts'&&method==='POST')||((m=path.match(/^\/api\/experts\/([^/]+)$/))&&method==='PUT')){

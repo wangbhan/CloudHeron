@@ -1,0 +1,198 @@
+[p1 "云鹭 · CloudHeron" | space "云鹭 API 参数验证"(10): 1 managed, 0 untracked — p1* "云鹭 · CloudHeron"]
+root
+  container
+    container
+      anchor [ref=191, url=http://127.0.0.1:8801/#projects]
+        image
+        container
+          text "云鹭"
+          text "CloudHeron"
+      text "API 参数回归团队"
+      text "创作空间"
+      anchor [ref=192, url=http://127.0.0.1:8801/#projects]
+        svg_root
+        text "项目"
+      anchor [ref=193, loc=href:/#workflow, url=http://127.0.0.1:8801/#workflow]
+        svg_root
+        text "工作流"
+      anchor [ref=194, loc=href:/#create, url=http://127.0.0.1:8801/#create]
+        svg_root
+        text "对话创作"
+      text "创作资源"
+      anchor [ref=195, loc=href:/#assets, url=http://127.0.0.1:8801/#assets]
+        svg_root
+        text "资产库"
+      anchor [ref=196, loc=href:/#skills, url=http://127.0.0.1:8801/#skills]
+        svg_root
+        text "Agent、Skill 与专家"
+      text "团队管理"
+      anchor [ref=197, loc=href:/#models, url=http://127.0.0.1:8801/#models]
+        svg_root
+        text "模型配置"
+      anchor [ref=198, loc=href:/#team, url=http://127.0.0.1:8801/#team]
+        svg_root
+        text "成员与权限"
+      anchor [ref=199, loc=href:/#api, url=http://127.0.0.1:8801/#api]
+        svg_root
+        text "工作流 API"
+      container
+        text "Q"
+        button [ref=200]
+          text "QA"
+          text "管理员"
+        button "退出登录" [ref=201, loc=css:button[aria-label="退出登录"]]
+          svg_root
+    container
+      container
+        text "API 参数回归团队"
+        text "/"
+        text "对话创作"
+        anchor [ref=202, loc=href:/#testing, url=http://127.0.0.1:8801/#testing]
+          text "手动测试"
+        button [ref=203]
+          svg_root
+          text "深色"
+      container
+        heading
+          text "对话创作"
+        paragraph
+          text "对话历史按项目整理；右侧显示所选 Agent 的配置。"
+        button [ref=204]
+          svg_root
+          text "新对话"
+        container
+          container
+            heading
+              text "项目与对话"
+            combobox "对话所属项目" [ref=205, loc=css:select[aria-label="对话所属项目"]]
+              text "功能验收测试项目"
+            container
+              container
+                anchor [ref=206, loc=href:/#create/project/project_428ff77b54272829c505d8bc, url=http://127.0.0.1:8801/#create/project/project_428ff77b54272829c505d8bc]
+                  text "功能验收测试项目"
+                text "3 个对话"
+                button "在功能验收测试项目中新建对话" [ref=207, loc=css:button[aria-label="在功能验收测试项目中新建对话"]]
+                  svg_root
+                  text "新建"
+              container
+                anchor [ref=208, loc=href:/#create/chat_77a5314f369bea7fa476a43c, url=http://127.0.0.1:8801/#create/chat_77a5314f369bea7fa476a43c]
+                  text "TST-011/013 · 图片 Agent"
+                anchor [ref=209, loc=href:/#create/chat_ae43f9fa177a1f1f749e19ef, url=http://127.0.0.1:8801/#create/chat_ae43f9fa177a1f1f749e19ef]
+                  text "TST-015 · 视频 Agent"
+                anchor [ref=210, loc=href:/#create/chat_e2bac30db6b46c792c154ad0, url=http://127.0.0.1:8801/#create/chat_e2bac30db6b46c792c154ad0]
+                  text "TST-014 · 提示词 Agent"
+          container
+            text "TST-015 · 视频 Agent"
+            text "功能验收测试项目"
+            container
+              svg_root
+              text "【预置测试说明，尚未调用模型】 测试 视频 Agent 的配置、专家选择与对话历史。请在右侧选择真实模型后发送以下内容： 白鹭缓慢展翅起飞，镜头向�..."
+              container
+                text "你"
+                text "视频参数测试，仅为夹具"
+              container
+                svg_root
+                container
+                  text "视频已生成。"
+                  container
+                    text "生成产物"
+                    anchor [ref=234, loc=href:/api/assets/asset_dbcc6c71e9d8f920e8856ec7/media, url=http://127.0.0.1:8801/api/assets/asset_dbcc6c71e9d8f920e8856ec7/media]
+                      text "下载"
+                    button [ref=235]
+                      text "资产详情"
+            form
+              container
+                text "创作描述"
+                textbox [ref=211, loc=css:textarea[name="chat-prompt"]]
+                  text "描述图片内容、视频动作，或要求整理提示词…"
+              container
+                text "生成结果加入项目与资产库"
+                button [ref=212]
+                  text "发送并生成"
+              paragraph
+          container
+            heading
+              text "视频 Agent 配置"
+            text "Agent"
+            combobox [ref=213, loc=css:select[name="chat-agent"]]
+              text "视频 Agent"
+            text "视频模型"
+            combobox [ref=214, loc=css:select[name="chat-model"]]
+              text "本机参数测试夹具"
+            container
+              text "理解对话的文本模型（选填）"
+              combobox [ref=215, loc=css:select[name="chat-text-model"]]
+                text "请选择模型"
+            container
+              text "参考图片或视频版本"
+              combobox [ref=216, loc=css:select[name="chat-asset"]]
+                text "未选择"
+            container
+              text "专家（多个 Skill 的组合）"
+              combobox [ref=217, loc=css:select[name="chat-expert"]]
+                text "动态影像专家"
+            paragraph
+              text "包含 Skill：视频动作描述、参考资产注入"
+            group [ref=218]
+              text "附加 Skill（可多选）"
+              container
+                checkbox [ref=219]
+                text "参考资产注入"
+              container
+                checkbox [ref=220]
+                text "提示词精炼"
+              container
+                checkbox [ref=221]
+                text "提示词结构整理"
+              container
+                checkbox [ref=222]
+                text "画面提示词"
+              container
+                checkbox [ref=223]
+                text "视频动作描述"
+            container
+              text "分辨率"
+              textbox [ref=224, loc=css:input[name="chat-size"]]
+                text "1280x720"
+            container
+              text "视频时长（秒）"
+              spinbutton [ref=225, loc=css:input[name="chat-seconds"]]
+                text "4"
+            container
+              text "随机种子（选填）"
+              spinbutton [ref=226, loc=css:input[name="chat-seed"]]
+            paragraph
+              text "可参考图片或视频文件。视频文件需要模型启用参考视频输入；字段在模型配置中设置。"
+            paragraph
+              text "专家与附加 Skill 合并使用；重复 Skill 只应用一次。"
+            container
+              container [ref=227]
+                text "API 可选参数"
+              container
+                paragraph
+                  text "仅发送填写的选项；具体参数需由所选模型支持。"
+                container
+                  text "帧率 fps"
+                  spinbutton [ref=228, loc=css:input[name="chat-api-fps"]]
+                    text "24"
+                container
+                  text "宽高比 aspect_ratio"
+                  textbox [ref=229, loc=css:textarea[name="chat-api-aspect_ratio"]]
+                    text "16:9"
+                text "负向提示词"
+                textbox [ref=230, loc=css:textarea[name="chat-api-negative_prompt"]]
+                text "引导强度 guidance_scale"
+                spinbutton [ref=231, loc=css:input[name="chat-api-guidance_scale"]]
+                  text "0"
+                text "采样步数"
+                spinbutton [ref=232, loc=css:input[name="chat-api-num_inference_steps"]]
+                text "额外 API 参数（JSON 对象，选填）"
+                textbox [ref=233, loc=css:textarea[name="chat-api-api_params"]]
+                  text "{"watermark":false,"nested":{"mode":"fast"},"labels":["qa"]}"
+                paragraph
+                  text "标准参数使用上方字段。JSON 可填写部署服务的其他参数；模型、提示词和参考文件由平台传递。"
+  svg_root
+  svg_root
+  svg_root
+  svg_root
+  svg_root
