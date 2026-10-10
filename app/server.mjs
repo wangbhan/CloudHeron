@@ -1,4 +1,6 @@
 import {taskOptions,normalizeApiOptions} from './lib/api-options.mjs';
+import {runtimeLock,scheduler,integerSetting} from './lib/runtime.mjs';
+import {idempotency} from './lib/idempotency.mjs';
 import http from 'node:http';
 import {readFile,writeFile,stat} from 'node:fs/promises';
 import {join,resolve,dirname,extname} from 'node:path';
@@ -32,8 +34,14 @@ export function sniff(data,mime) {
   if(data.length<10||data.length>100*1024*1024)throw Error('媒体文件大小须为 10 字节–100 MB');return mime;
 }
 
-export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'),pollMs=2500}={}) {
-  const d=database(resolve(dataDir)),v=vault(d.key),queue=[];let workers=0;
+export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'),pollMs=2500,workerConcurrency=process.env.CLOUDHERON_WORKERS??2,maxPending=process.env.CLOUDHERON_MAX_PENDING_PER_USER??10}={}) {
+  const concurrency=integerSetting(workerConcurrency,'CLOUDHERON_WORKERS',1,8),pendingLimit=integerSetting(maxPending,'CLOUDHERON_MAX_PENDING_PER_USER',1,100);
+  const unlock=runtimeLock(resolve(dataDir));let d;
+  try{d=database(resolve(dataDir));}catch(e){unlock();throw e;}
+  const v=vault(d.key);let closing=false,closePromise=null;
+  const runtime=scheduler({concurrency,claim:()=>d.tx(()=>{const j=d.one("SELECT id FROM jobs WHERE status='queued' ORDER BY created_at,rowid LIMIT 1");if(!j)return null;return d.run("UPDATE jobs SET status='running',updated_at=? WHERE id=? AND status='queued'",now(),j.id).changes?j.id:null;}),execute:runJob,onError:markJobFailed});
+  const requestRecord=(req,u,scope,b)=>idempotency(d,{key:req.headers['idempotency-key'],owner:u.id,scope,body:b},fail);
+  const replay=(res,record)=>{if(!record.replay)return false;res.setHeader('Idempotency-Replayed','true');send(res,jobView(record.replay),202);return true;};
   const project=(u,pid,edit=false)=>{const p=d.one('SELECT * FROM projects WHERE id=?',pid);if(!p)fail(404,'项目不存在');if(!permission(u,p,edit))fail(403,'当前账号缺少项目权限');return p;};
   const editor=u=>{if(u.role==='viewer')fail(403,'查看者仅可查看，操作需要编辑者或管理员权限');};
   const admin=u=>{if(u.role!=='admin')fail(403,'此操作需要管理员权限');};
@@ -63,18 +71,25 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
   const adapters=job=>provider({secret:v.decrypt,loadMedia:a=>readFile(join(d.dir,'media',a.file)),saveMedia:(data,kind,mime)=>saveAsset(data,kind,mime,job),pollMs});
   function enqueue(u,{project_id,source,source_id,snapshot,publication_id=null}) {
     project(u,project_id,true);
-    if(d.one("SELECT COUNT(*) n FROM jobs WHERE owner_id=? AND status IN ('queued','running')",u.id).n>=10)fail(429,'当前账号已有 10 个待完成任务，请等待后再提交');
-    const jid=id('job');d.run('INSERT INTO jobs(id,project_id,owner_id,source,source_id,publication_id,snapshot,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',jid,project_id,u.id,source,source_id,publication_id,json(snapshot),'queued',now(),now());queue.push(jid);setImmediate(pump);return jobView(d.one('SELECT * FROM jobs WHERE id=?',jid));
+    if(closing)fail(503,'服务正在停止，请稍后提交');
+    if(d.one("SELECT COUNT(*) n FROM jobs WHERE owner_id=? AND status IN ('queued','running')",u.id).n>=pendingLimit)fail(429,`当前账号已有 ${pendingLimit} 个待完成任务，请等待后再提交`);
+    const jid=id('job');d.run('INSERT INTO jobs(id,project_id,owner_id,source,source_id,publication_id,snapshot,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)',jid,project_id,u.id,source,source_id,publication_id,json(snapshot),'queued',now(),now());runtime.kick();return jobView(d.one('SELECT * FROM jobs WHERE id=?',jid));
   }
-  async function pump(){while(workers<2&&queue.length){workers++;const jid=queue.shift();runJob(jid).finally(()=>{workers--;pump();});}}
+  function markJobFailed(jid,e){
+    const j=d.one('SELECT * FROM jobs WHERE id=?',jid);if(!j)return;
+    const error=String(e.message||e).slice(0,500),steps=parse(j.steps);
+    for(const step of Object.values(steps))if(step.status==='running'){step.status='failed';step.error=error;}
+    d.tx(()=>{d.run("UPDATE jobs SET status='failed',error=?,steps=?,updated_at=? WHERE id=?",error,json(steps),now(),jid);
+      if(j.source==='chat'){const c=d.one('SELECT messages FROM chats WHERE id=?',j.source_id);if(c){const messages=parse(c.messages);if(!messages.some(m=>m.role==='assistant'&&m.job_id===jid)){messages.push({id:id('msg'),role:'assistant',text:'生成失败：'+error,job_id:jid,at:now()});d.run('UPDATE chats SET messages=?,updated_at=? WHERE id=?',json(messages),now(),j.source_id);}}}
+    });
+  }
   async function runJob(jid) {
     const j=d.one('SELECT * FROM jobs WHERE id=?',jid),snap=parse(j.snapshot),steps={};
     const principal=()=>{const u=d.one('SELECT * FROM users WHERE id=?',j.owner_id);project(u,j.project_id,true);return u;};
     const onStep=async(n,state,out,error)=>{steps[n]={status:state,...(out?{output:out}:{}),...(error?{error}:{} )};d.run('UPDATE jobs SET steps=?,updated_at=? WHERE id=?',json(steps),now(),jid);};
-    d.run("UPDATE jobs SET status='running',updated_at=? WHERE id=?",now(),jid);
     try {
       principal();const api=adapters(j),generate=async(kind,mid,prompt,refs,p)=>{principal();return api.generate(model(mid),kind,applySkills(kind,prompt,p.skill_ids||[]),refs,p);};
-      let outputs=[];
+      let outputs=[],assistant=null;
       if(j.source==='chat') {
         const config=snap.config;await onStep('agent','running');
         const refs=(config.asset_ids||[]).map(a=>asset(principal(),a));
@@ -88,10 +103,10 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
           outputs=await generate(config.kind,config.model_id,prompt,refs,config);result=(config.kind==='image'?'图片':'视频')+'已生成。';
         }
         await onStep('agent','completed');
-        d.tx(()=>{const c=d.one('SELECT messages FROM chats WHERE id=?',j.source_id);const messages=parse(c.messages);messages.push({id:id('msg'),role:'assistant',text:result,outputs:outputs.map(a=>a.id),job_id:jid,at:now()});d.run('UPDATE chats SET messages=?,updated_at=? WHERE id=?',json(messages),now(),j.source_id);});
+        assistant={id:id('msg'),role:'assistant',text:result,outputs:outputs.map(a=>a.id),job_id:jid,at:now()};
       }else outputs=await executeWorkflow(snap.document,{input:snap.input,resolveAsset:aid=>asset(principal(),aid),generate,chat:(mid,prompt,params)=>api.chat(model(mid),[{role:'system',content:'你是云鹭提示词 Agent，整理可用提示词。'}, {role:'user',content:applySkills('prompt',prompt,params.skill_ids||[])}],params),onStep});
-      d.run("UPDATE jobs SET status='completed',outputs=?,updated_at=? WHERE id=?",json(outputs.map(a=>a.id)),now(),jid);
-    }catch(e){d.run("UPDATE jobs SET status='failed',error=?,updated_at=? WHERE id=?",e.message.slice(0,500),now(),jid);if(j.source==='chat')d.tx(()=>{const c=d.one('SELECT messages FROM chats WHERE id=?',j.source_id);if(c){const messages=parse(c.messages);messages.push({id:id('msg'),role:'assistant',text:'生成失败：'+e.message.slice(0,500),job_id:jid,at:now()});d.run('UPDATE chats SET messages=?,updated_at=? WHERE id=?',json(messages),now(),j.source_id);}});}
+      d.tx(()=>{if(assistant){const c=d.one('SELECT messages FROM chats WHERE id=?',j.source_id),messages=parse(c.messages);messages.push(assistant);d.run('UPDATE chats SET messages=?,updated_at=? WHERE id=?',json(messages),now(),j.source_id);}d.run("UPDATE jobs SET status='completed',outputs=?,updated_at=? WHERE id=?",json(outputs.map(a=>a.id)),now(),jid);});
+    }catch(e){markJobFailed(jid,e);}
   }
   const attempts=new Map();
   function rate(ip) {const old=attempts.get(ip),entry=!old||Date.now()>old.until?{n:0,until:Date.now()+60000}:old;entry.n++;attempts.set(ip,entry);if(attempts.size>2000)for(const [k,a]of attempts)if(a.until<Date.now())attempts.delete(k);if(entry.n>15)fail(429,'操作过于频繁，请一分钟后再试');}
@@ -104,6 +119,7 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
     const headers={'Content-Type':a.mime,'Content-Length':info.size,'Cache-Control':'private, no-store','Accept-Ranges':'bytes','Content-Disposition':'inline'};
     if(range){const m=range.match(/^bytes=(\d+)-(\d*)$/);if(!m)fail(416,'请求范围有误');const start=Number(m[1]),end=m[2]?Math.min(Number(m[2]),info.size-1):info.size-1;if(start>=info.size||end<start)fail(416,'请求范围超出文件');const buffer=await readFile(file);headers['Content-Length']=end-start+1;headers['Content-Range']=`bytes ${start}-${end}/${info.size}`;res.writeHead(206,headers);res.end(buffer.subarray(start,end+1));}else{res.writeHead(200,headers);res.end(await readFile(file));}
   }
+  for(const j of d.all("SELECT id FROM jobs WHERE status='running'"))markJobFailed(j.id,Error('服务重启中断任务，请检查当前产物后重新运行'));
   const server=http.createServer(async(req,res)=>{
     res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');res.setHeader('X-Frame-Options','DENY');
     res.setHeader('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
@@ -116,9 +132,10 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
         const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.json':'application/json'}[extname(p)]||'application/octet-stream';
         try{const file=await readFile(p);res.writeHead(200,{'Content-Type':mime,'Cache-Control':'no-cache'});res.end(method==='HEAD'?undefined:file);}catch{fail(404,'页面或文件不存在');}return;
       }
+      if(method==='GET'&&(path==='/api/health'||path==='/api/ready')){try{d.one('SELECT 1');}catch{fail(503,'服务尚未就绪');}send(res,{status:closing?'draining':path==='/api/ready'?'ready':'ok',version:'0.1.6'},closing?503:200);return;}
       if(path.startsWith('/api/v1/')) {
         const {p,u}=bearer(req);
-        if(method==='POST'&&(m=path.match(/^\/api\/v1\/endpoints\/([^/]+)\/runs$/))){if(m[1]!==p.id)fail(403,'凭据与接口不匹配');const b=await body(req);if(typeof b.prompt!=='string'||!b.prompt.trim()||b.prompt.length>32000)fail(400,'prompt 须为 1–32000 个字符');wfResources(u,parse(p.document));send(res,enqueue(u,{project_id:p.project_id,source:'workflow',source_id:p.workflow_id,publication_id:p.id,snapshot:{document:parse(p.document),input:{prompt:b.prompt}}}),202);return;}
+        if(method==='POST'&&(m=path.match(/^\/api\/v1\/endpoints\/([^/]+)\/runs$/))){if(m[1]!==p.id)fail(403,'凭据与接口不匹配');const b=await body(req),record=requestRecord(req,u,'endpoint:'+p.id,b);if(replay(res,record))return;if(typeof b.prompt!=='string'||!b.prompt.trim()||b.prompt.length>32000)fail(400,'prompt 须为 1–32000 个字符');wfResources(u,parse(p.document));send(res,d.tx(()=>{const j=enqueue(u,{project_id:p.project_id,source:'workflow',source_id:p.workflow_id,publication_id:p.id,snapshot:{document:parse(p.document),input:{prompt:b.prompt}}});record.record(j.id);return j;}),202);return;}
         if(method==='GET'&&(m=path.match(/^\/api\/v1\/runs\/([^/]+)$/))){const j=d.one('SELECT * FROM jobs WHERE id=? AND publication_id=?',m[1],p.id);if(!j)fail(404,'任务不存在');const view=jobView(j);view.outputs=view.outputs.map(aid=>({asset_id:aid,url:'/api/v1/runs/'+j.id+'/assets/'+aid}));send(res,view);return;}
         if(method==='GET'&&(m=path.match(/^\/api\/v1\/runs\/([^/]+)\/assets\/([^/]+)$/))){const j=d.one('SELECT * FROM jobs WHERE id=? AND publication_id=?',m[1],p.id);if(!j||!parse(j.outputs).includes(m[2]))fail(404,'产物不存在');await mediaResponse(req,res,asset(u,m[2]));return;}
         fail(404,'API 路径不存在');
@@ -182,7 +199,7 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
       if(path==='/api/workflows'&&method==='POST'){editor(u);const b=await body(req);project(u,b.project_id,true);const name=text(b.name,'工作流名称'),w=b.document||template(name);wfResources(u,w);send(res,wfView(createWorkflow(u,b.project_id,name,w)),201);return;}
       if((m=path.match(/^\/api\/workflows\/([^/]+)$/))&&method==='GET'){const w=resource('workflows',u,m[1]);send(res,{...wfView(w),can_edit:permission(u,d.one('SELECT * FROM projects WHERE id=?',w.project_id),true),job:jobViewOrNull(d.one('SELECT * FROM jobs WHERE source_id=? ORDER BY created_at DESC LIMIT 1',w.id))});return;}
       if((m=path.match(/^\/api\/workflows\/([^/]+)$/))&&method==='PUT'){const w=resource('workflows',u,m[1],true),b=await body(req);wfResources(u,b.document);send(res,wfView(storeWorkflow(w,u,b.revision,b.document,'save')));return;}
-      if((m=path.match(/^\/api\/workflows\/([^/]+)\/run$/))&&method==='POST'){const w=resource('workflows',u,m[1],true),b=await body(req);if(b.revision!==w.revision)fail(409,'请保存或刷新当前工作流再运行');const document=parse(w.document);validateWorkflow(document);send(res,enqueue(u,{project_id:w.project_id,source:'workflow',source_id:w.id,snapshot:{document,input:{}}}),202);return;}
+      if((m=path.match(/^\/api\/workflows\/([^/]+)\/run$/))&&method==='POST'){const w=resource('workflows',u,m[1],true),b=await body(req),record=requestRecord(req,u,'workflow:'+w.id,b);if(replay(res,record))return;if(b.revision!==w.revision)fail(409,'请保存或刷新当前工作流再运行');const document=parse(w.document);validateWorkflow(document);send(res,d.tx(()=>{const j=enqueue(u,{project_id:w.project_id,source:'workflow',source_id:w.id,snapshot:{document,input:{}}});record.record(j.id);return j;}),202);return;}
       if((m=path.match(/^\/api\/workflows\/([^/]+)\/assist$/))&&method==='POST'){
         const w=resource('workflows',u,m[1],true),b=await body(req);if(!['analyze','modify'].includes(b.mode))fail(400,'请选择分析或修改');const prompt=text(b.prompt,'对话内容',10000),api=adapters(null);
         const instruction=b.mode==='analyze'?'仅分析工作流，说明问题与建议。禁止执行任务。':`你是工作流编辑助手。只返回 JSON 对象 {"explanation":"修改摘要","document":完整工作流JSON}。schema_version 为 1.0，节点类型限定 ${Object.keys(nodeTypes).join(',')}。保留已有模型和资产编号，完整返回所有节点与连线，不执行任何任务。`;
@@ -200,11 +217,11 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
       if(path==='/api/chats'&&method==='POST'){const b=await body(req);project(u,b.project_id,true);const cid=id('chat');d.run('INSERT INTO chats(id,project_id,title,updated_at) VALUES(?,?,?,?)',cid,b.project_id,text(b.title,'对话名称'),now());send(res,d.one('SELECT * FROM chats WHERE id=?',cid),201);return;}
       if((m=path.match(/^\/api\/chats\/([^/]+)$/))&&method==='GET'){const c=resource('chats',u,m[1]);send(res,{...c,messages:parse(c.messages),can_edit:permission(u,d.one('SELECT * FROM projects WHERE id=?',c.project_id),true),job:jobViewOrNull(d.one('SELECT * FROM jobs WHERE source_id=? ORDER BY created_at DESC LIMIT 1',c.id))});return;}
       if((m=path.match(/^\/api\/chats\/([^/]+)\/messages$/))&&method==='POST'){
-        const c=resource('chats',u,m[1],true),b=await body(req),prompt=text(b.prompt,'创作描述',32000),config=normalizeChatConfig(b.config,{getModel:model,getSkill:sid=>d.one('SELECT * FROM skills WHERE id=?',sid),getExpert:eid=>d.one('SELECT * FROM experts WHERE id=?',eid)});
+        const c=resource('chats',u,m[1],true),b=await body(req),record=requestRecord(req,u,'chat:'+c.id,b);if(replay(res,record))return;const prompt=text(b.prompt,'创作描述',32000),config=normalizeChatConfig(b.config,{getModel:model,getSkill:sid=>d.one('SELECT * FROM skills WHERE id=?',sid),getExpert:eid=>d.one('SELECT * FROM experts WHERE id=?',eid)});
         for(const aid of config.asset_ids)asset(u,aid);
         if(d.one("SELECT id FROM jobs WHERE source_id=? AND status IN ('queued','running')",c.id))fail(409,'当前对话正在生成，请完成后再发送');
         const messages=parse(c.messages);messages.push({id:id('msg'),role:'user',text:prompt,config,at:now()});
-        const job=d.tx(()=>{const j=enqueue(u,{project_id:c.project_id,source:'chat',source_id:c.id,snapshot:{prompt,config,messages}});d.run('UPDATE chats SET messages=?,updated_at=? WHERE id=?',json(messages),now(),c.id);return j;});send(res,job,202);return;
+        const job=d.tx(()=>{const j=enqueue(u,{project_id:c.project_id,source:'chat',source_id:c.id,snapshot:{prompt,config,messages}});record.record(j.id);d.run('UPDATE chats SET messages=?,updated_at=? WHERE id=?',json(messages),now(),c.id);return j;});send(res,job,202);return;
       }
       if(path==='/api/assets'&&method==='GET'){send(res,d.all('SELECT * FROM assets ORDER BY created_at DESC').filter(a=>a.project_id?permission(u,d.one('SELECT * FROM projects WHERE id=?',a.project_id)):permission(u,a)).map(assetView));return;}
       if(path==='/api/assets'&&method==='POST'){editor(u);const b=await body(req);if(b.project_id)project(u,b.project_id,true);if(!['image','video','character','scene','prop','style'].includes(b.kind)||!['team','private'].includes(b.visibility))fail(400,'资产类型或共享范围有误');const data=Buffer.from(String(b.base64||''),'base64');if(data.length>20*1024*1024)fail(413,'上传文件上限为 20 MB');sniff(data,b.mime);let version=1,parent=null;if(b.parent_id){parent=asset(u,b.parent_id);if(parent.owner_id!==u.id&&u.role!=='admin')fail(403,'仅资产创建者或管理员可上传新版本');version=parent.version+1;}
@@ -215,6 +232,7 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
       if(path==='/api/models'&&method==='POST'){admin(u);const b=await body(req),mid=id('model');validateModel(b.spec);d.run('INSERT INTO models(id,name,spec,secret,updated_at) VALUES(?,?,?,?,?)',mid,text(b.name,'配置名称'),json(b.spec),v.encrypt(String(b.api_key||'')),now());send(res,modelView(d.one('SELECT * FROM models WHERE id=?',mid),u),201);return;}
       if((m=path.match(/^\/api\/models\/([^/]+)$/))&&method==='PUT'){admin(u);const old=d.one('SELECT * FROM models WHERE id=?',m[1]);if(!old)fail(404,'模型不存在');const b=await body(req);validateModel(b.spec);d.run('UPDATE models SET name=?,spec=?,secret=?,enabled=?,updated_at=? WHERE id=?',text(b.name,'配置名称'),json(b.spec),b.api_key===undefined?old.secret:v.encrypt(String(b.api_key)),b.enabled===false?0:1,now(),old.id);send(res,modelView(d.one('SELECT * FROM models WHERE id=?',old.id),u));return;}
       if((m=path.match(/^\/api\/models\/([^/]+)\/check$/))&&method==='POST'){admin(u);const mod=model(m[1]);const result=await adapters(null).request(mod,parse(mod.spec).paths?.models||'/models');send(res,{ok:true,models:(result.data||[]).map(x=>x.id),note:'服务连接成功；生成能力以实际任务结果为准'});return;}
+      if(path==='/api/system/status'&&method==='GET'){admin(u);send(res,{version:'0.1.6',state:closing?'draining':'ready',workers:runtime.state(),max_pending_per_user:pendingLimit,queued:d.one("SELECT COUNT(*) n FROM jobs WHERE status='queued'").n,running:d.one("SELECT COUNT(*) n FROM jobs WHERE status='running'").n});return;}
       if(path==='/api/task-options'&&method==='GET'){send(res,taskOptions);return;}
       if(path==='/api/agents'&&method==='GET'){send(res,agents);return;}
       if(path==='/api/experts'&&method==='GET'){send(res,d.all('SELECT * FROM experts ORDER BY builtin DESC,name').map(x=>({...x,skill_ids:parse(x.skill_ids)})));return;}
@@ -243,8 +261,14 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
   });
   function jobViewOrNull(j){return j?jobView(j):null;}
   server.requestTimeout=300000;server.headersTimeout=20000;
-  return {server,db:d,close:async()=>{await new Promise(r=>server.close(r));d.db.close();}};
+  server.on('listening',()=>{if(!closing)runtime.start();});
+  const close=()=>{if(closePromise)return closePromise;closing=true;runtime.pause();closePromise=(async()=>{await Promise.all([new Promise(r=>server.close(r)),runtime.drain()]);try{d.db.close();}finally{unlock();}})();return closePromise;};
+  return {server,db:d,close};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  const app=createApp(),port=Number(process.env.PORT||8800),host=process.env.HOST||'127.0.0.1';app.server.listen(port,host,()=>console.log(`云鹭 · CloudHeron http://${host}:${port}`));
+  const app=createApp(),port=integerSetting(process.env.PORT??8800,'PORT',1,65535),host=process.env.HOST||'127.0.0.1';
+  app.server.listen(port,host,()=>console.log(`云鹭 · CloudHeron http://${host}:${port}`));
+  const shutdown=()=>{app.close().catch(e=>{console.error(e.message);process.exitCode=1;});};
+  process.once('SIGTERM',shutdown);process.once('SIGINT',shutdown);
+  app.server.once('error',e=>{console.error(e.message);process.exitCode=1;shutdown();});
 }

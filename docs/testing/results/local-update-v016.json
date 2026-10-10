@@ -1,0 +1,41 @@
+{
+  "date": "2026-10-10",
+  "version": "0.1.6",
+  "preserved": {
+    "users": 2,
+    "projects": 2,
+    "workflows": 7,
+    "chats": 3,
+    "assets": 4,
+    "models": 0
+  },
+  "account_password_and_model_credentials_preserved": true,
+  "manual_cases": 36,
+  "active_jobs": 0,
+  "checks": [
+    {
+      "path": "/api/health",
+      "status": 200,
+      "result": {
+        "status": "ok",
+        "version": "0.1.6"
+      }
+    },
+    {
+      "path": "/api/ready",
+      "status": 200,
+      "result": {
+        "status": "ready",
+        "version": "0.1.6"
+      }
+    },
+    {
+      "path": "/api/system/status",
+      "status": 401
+    },
+    {
+      "path": "/test-cases.json",
+      "status": 200
+    }
+  ]
+}

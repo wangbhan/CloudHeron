@@ -1,6 +1,7 @@
 import {DatabaseSync} from 'node:sqlite';
 import {librarySchema} from './workflow-library.mjs';
 import {manualCaseSchema} from './manual-fixtures.mjs';
+import {requestSchema} from './idempotency.mjs';
 import {mkdirSync, existsSync, readFileSync, writeFileSync, chmodSync} from 'node:fs';
 import {join} from 'node:path';
 import {randomBytes} from 'node:crypto';
@@ -28,11 +29,11 @@ export function database(dir) {
     CREATE INDEX IF NOT EXISTS assets_project ON assets(project_id);
     CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);`);
   db.exec(manualCaseSchema);
+  db.exec(requestSchema);
   db.exec(librarySchema);
   db.exec("INSERT OR IGNORE INTO workflow_versions(workflow_id,revision,document,action,saved_at) SELECT id,revision,document,'baseline',updated_at FROM workflows");
   const one=(sql,...args)=>db.prepare(sql).get(...args),all=(sql,...args)=>db.prepare(sql).all(...args),run=(sql,...args)=>db.prepare(sql).run(...args);
   const tx=fn=>{db.exec('BEGIN IMMEDIATE');try{const result=fn();db.exec('COMMIT');return result;}catch(e){db.exec('ROLLBACK');throw e;}};
-  run("UPDATE jobs SET status='failed',error='服务重启中断任务，请检查当前产物后重新运行',updated_at=? WHERE status IN ('queued','running')",new Date().toISOString());
   for(const [id,name,task,template] of [
     ['skill_visual','画面提示词','image','主体、环境、光线与构图：{{prompt}}'],
     ['skill_motion','视频动作描述','video','明确主体动作与运镜，避免无关切换：{{prompt}}'],

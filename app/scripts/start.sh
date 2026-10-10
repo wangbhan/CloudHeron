@@ -1,0 +1,12 @@
+#!/bin/sh
+set -eu
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+APP_DIR=$(CDPATH= cd -- "$SCRIPT_DIR/.." && pwd)
+cd "$APP_DIR"
+: "${CLOUDHERON_DATA:=$APP_DIR/data}"
+: "${HOST:=127.0.0.1}"
+: "${PORT:=8800}"
+: "${CLOUDHERON_WORKERS:=2}"
+: "${CLOUDHERON_MAX_PENDING_PER_USER:=10}"
+export CLOUDHERON_DATA HOST PORT CLOUDHERON_WORKERS CLOUDHERON_MAX_PENDING_PER_USER
+exec "${CLOUDHERON_NODE_BIN:-node}" server.mjs

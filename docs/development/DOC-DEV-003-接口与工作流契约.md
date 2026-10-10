@@ -1,7 +1,7 @@
 # 云鹭接口与工作流契约
 
 文档编号：DOC-DEV-003  
-版本：v0.1.5
+版本：v0.1.6
 日期：2026-10-01  
 关联：DEV-007 / 008 / 009 / 010，REQ-006 / 009 / 010 / 021
 
@@ -115,3 +115,9 @@ keep_bindings 默认 false，清空 model_id/asset_id；true 时重新验证引�
 GET /api/task-options 返回 image/video/text 的字段 schema（需登录）。工作流生成节点 params 和对话 config 可携带该任务的直接字段以及 api_params 对象；媒体对话的 text_options 用于辅助文本模型。工作流 assist 请求新增 params 对象用于文本参数。完整字段和类型见 DOC-DEV-007。
 
 未填省略；模型 extra、api_params、任务显式参数、平台输入依次覆盖。JSON 保留类型，multipart 标量为文本，对象/数组为 JSON 文本。非法参数在保存或创建任务前拒绝；实际模型不支持时按原任务错误路径展示。
+
+## v0.1.6 后端运行接口
+
+GET `/api/health` 返回 `{status:"ok",version:"0.1.6"}`；GET `/api/ready` 就绪返回 ready，停止/数据库不可用为 503。GET `/api/system/status` 需要管理员，返回 workers、queued、running、max_pending_per_user，不含模型或凭据。
+
+工作流 run、对话 messages 与 `/api/v1/endpoints/:id/runs` 的 POST 支持可选 Idempotency-Key，规则见 DOC-DEV-008。排队快照重启可恢复，running 中断不自动重试。现有无键客户端与工作流 JSON 格式兼容。

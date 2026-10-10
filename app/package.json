@@ -1,6 +1,6 @@
 {
   "name": "cloudheron",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "type": "module",
   "engines": {
@@ -9,6 +9,8 @@
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test tests/*.test.mjs",
-    "check": "node --check server.mjs && node --check public/app.js"
+    "check": "node --check server.mjs && node --check public/app.js",
+    "health": "node scripts/healthcheck.mjs",
+    "test:backend": "node --test tests/backend.test.mjs"
   }
 }

@@ -1,6 +1,6 @@
 # 云鹭 · CloudHeron 文档入口
 
-当前为开发阶段：RAW-011 接受 v0.3.2 界面并授权实现功能。DEV-001 至 DEV-020 已登记，代码在 app。剩余需求细节保留；32 条手动用例已登记；正式验收与生产上线待执行。
+当前为开发阶段：RAW-011 接受 v0.3.2 界面并授权实现功能。DEV-001 至 DEV-022 已登记，代码在 app。剩余需求细节保留；36 条手动用例已登记；正式验收与生产上线待执行。
 
 - [DOC-GOV-001 编号与阶段规则](DOC-GOV-001-编号与阶段规则.md)
 - [DOC-RAW-001 原始需求](requirements/DOC-RAW-001-原始需求记录.md)
@@ -30,3 +30,8 @@
 - [DOC-DES-009 任务级 API 参数设计](design/DOC-DES-009-任务级API参数设计.md)
 - [DOC-DEV-007 任务级 API 参数实施](development/DOC-DEV-007-任务级API参数实施.md)
 - [DOC-TST-005 任务级 API 参数验证](testing/DOC-TST-005-任务级API参数验证.md)
+
+- [DOC-DES-010 后端任务与运行管理设计](design/DOC-DES-010-后端任务与运行管理设计.md)
+- [DOC-DEV-008 后端任务与运行管理实施](development/DOC-DEV-008-后端任务与运行管理实施.md)
+- [DOC-TST-006 后端验证记录](testing/DOC-TST-006-后端验证记录.md)
+- [DOC-REL-002 单机后端启动与回滚](release/DOC-REL-002-单机后端启动与回滚.md)
