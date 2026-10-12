@@ -19,3 +19,9 @@ vault.key
 *.tmp
 *.bak
 ~$*
+
+# Python 后端本机环境
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/

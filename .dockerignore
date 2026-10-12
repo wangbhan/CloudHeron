@@ -1,0 +1,12 @@
+.git
+.idea
+.work
+**/.env
+**/.env.*
+**/.venv
+**/__pycache__
+**/.pytest_cache
+app/data
+docs
+design
+outputs

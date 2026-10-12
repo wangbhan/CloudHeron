@@ -1,0 +1,2 @@
+-r requirements.lock
+moto[server]==5.2.4

@@ -1,0 +1,528 @@
+{
+  "task_options": {
+    "image": [
+      {
+        "key": "n",
+        "label": "图片数量",
+        "type": "number",
+        "min": 1,
+        "max": 4,
+        "integer": true
+      },
+      {
+        "key": "quality",
+        "label": "质量",
+        "type": "select",
+        "values": [
+          "auto",
+          "standard",
+          "hd",
+          "low",
+          "medium",
+          "high"
+        ]
+      },
+      {
+        "key": "style",
+        "label": "画面风格",
+        "type": "select",
+        "values": [
+          "vivid",
+          "natural"
+        ]
+      },
+      {
+        "key": "background",
+        "label": "背景",
+        "type": "select",
+        "values": [
+          "auto",
+          "opaque",
+          "transparent"
+        ]
+      },
+      {
+        "key": "output_format",
+        "label": "输出格式",
+        "type": "select",
+        "values": [
+          "png",
+          "jpeg",
+          "webp"
+        ]
+      },
+      {
+        "key": "output_compression",
+        "label": "输出压缩质量",
+        "type": "number",
+        "min": 0,
+        "max": 100,
+        "integer": true
+      },
+      {
+        "key": "response_format",
+        "label": "响应格式",
+        "type": "select",
+        "values": [
+          "b64_json",
+          "url"
+        ]
+      },
+      {
+        "key": "negative_prompt",
+        "label": "负向提示词",
+        "type": "string",
+        "maxLength": 4000
+      },
+      {
+        "key": "guidance_scale",
+        "label": "引导强度 guidance_scale",
+        "type": "number",
+        "min": 0,
+        "max": 50,
+        "integer": false
+      },
+      {
+        "key": "num_inference_steps",
+        "label": "采样步数",
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "integer": true
+      }
+    ],
+    "video": [
+      {
+        "key": "fps",
+        "label": "帧率 fps",
+        "type": "number",
+        "min": 1,
+        "max": 120,
+        "integer": true
+      },
+      {
+        "key": "aspect_ratio",
+        "label": "宽高比 aspect_ratio",
+        "type": "string",
+        "maxLength": 40
+      },
+      {
+        "key": "negative_prompt",
+        "label": "负向提示词",
+        "type": "string",
+        "maxLength": 4000
+      },
+      {
+        "key": "guidance_scale",
+        "label": "引导强度 guidance_scale",
+        "type": "number",
+        "min": 0,
+        "max": 50,
+        "integer": false
+      },
+      {
+        "key": "num_inference_steps",
+        "label": "采样步数",
+        "type": "number",
+        "min": 1,
+        "max": 200,
+        "integer": true
+      }
+    ],
+    "text": [
+      {
+        "key": "temperature",
+        "label": "温度 temperature",
+        "type": "number",
+        "min": 0,
+        "max": 2,
+        "integer": false
+      },
+      {
+        "key": "top_p",
+        "label": "概率采样 top_p",
+        "type": "number",
+        "min": 0,
+        "max": 1,
+        "integer": false
+      },
+      {
+        "key": "top_k",
+        "label": "候选数 top_k",
+        "type": "number",
+        "min": 1,
+        "max": 1000,
+        "integer": true
+      },
+      {
+        "key": "max_tokens",
+        "label": "最大输出 tokens",
+        "type": "number",
+        "min": 1,
+        "max": 131072,
+        "integer": true
+      },
+      {
+        "key": "presence_penalty",
+        "label": "主题惩罚 presence_penalty",
+        "type": "number",
+        "min": -2,
+        "max": 2,
+        "integer": false
+      },
+      {
+        "key": "frequency_penalty",
+        "label": "重复惩罚 frequency_penalty",
+        "type": "number",
+        "min": -2,
+        "max": 2,
+        "integer": false
+      },
+      {
+        "key": "repetition_penalty",
+        "label": "重复系数 repetition_penalty",
+        "type": "number",
+        "min": 0.01,
+        "max": 10,
+        "integer": false
+      },
+      {
+        "key": "seed",
+        "label": "文本随机种子",
+        "type": "number",
+        "min": -9007199254740991,
+        "max": 9007199254740991,
+        "integer": true
+      },
+      {
+        "key": "stop",
+        "label": "停止词（每行一个，最多 4 个）",
+        "type": "lines"
+      }
+    ]
+  },
+  "node_types": {
+    "prompt_input": {
+      "name": "提示词输入",
+      "output": "text"
+    },
+    "reference_asset": {
+      "name": "参考资产",
+      "output": "reference"
+    },
+    "prompt_agent": {
+      "name": "提示词 Agent",
+      "output": "text"
+    },
+    "image_generate": {
+      "name": "图片生成",
+      "output": "image"
+    },
+    "video_generate": {
+      "name": "视频生成",
+      "output": "video"
+    },
+    "media_output": {
+      "name": "产物输出",
+      "output": "media"
+    }
+  },
+  "agents": [
+    {
+      "id": "image",
+      "name": "图片 Agent",
+      "description": "组织画面与参考图，调用图片模型。",
+      "model_capability": "image",
+      "fields": [
+        "model_id",
+        "text_model_id",
+        "asset_ids",
+        "expert_id",
+        "skill_ids",
+        "size",
+        "seed",
+        "text_options",
+        "api_params",
+        "n",
+        "quality",
+        "style",
+        "background",
+        "output_format",
+        "output_compression",
+        "response_format",
+        "negative_prompt",
+        "guidance_scale",
+        "num_inference_steps"
+      ],
+      "defaults": {
+        "size": "1024x1024"
+      }
+    },
+    {
+      "id": "video",
+      "name": "视频 Agent",
+      "description": "组织动作与运镜，调用视频模型。",
+      "model_capability": "video",
+      "fields": [
+        "model_id",
+        "text_model_id",
+        "asset_ids",
+        "expert_id",
+        "skill_ids",
+        "size",
+        "seconds",
+        "seed",
+        "text_options",
+        "api_params",
+        "fps",
+        "aspect_ratio",
+        "negative_prompt",
+        "guidance_scale",
+        "num_inference_steps"
+      ],
+      "defaults": {
+        "size": "1280x720",
+        "seconds": 4
+      }
+    },
+    {
+      "id": "prompt",
+      "name": "提示词 Agent",
+      "description": "整理图片或视频提示词，返回文字。",
+      "model_capability": "text",
+      "fields": [
+        "model_id",
+        "kind",
+        "expert_id",
+        "skill_ids",
+        "api_params",
+        "temperature",
+        "top_p",
+        "top_k",
+        "max_tokens",
+        "presence_penalty",
+        "frequency_penalty",
+        "repetition_penalty",
+        "seed",
+        "stop"
+      ],
+      "defaults": {
+        "kind": "image"
+      }
+    }
+  ],
+  "templates": [
+    {
+      "id": "builtin_image",
+      "name": "图片生成模板",
+      "description": "提示词 → 图片生成 → 产物输出",
+      "document": {
+        "schema_version": "1.0",
+        "name": "图片生成模板",
+        "nodes": [
+          {
+            "id": "prompt",
+            "type": "prompt_input",
+            "label": "提示词输入",
+            "params": {
+              "prompt": "描述主体、环境、光线和构图"
+            },
+            "position": {
+              "x": 40,
+              "y": 90
+            }
+          },
+          {
+            "id": "image",
+            "type": "image_generate",
+            "label": "图片生成",
+            "params": {
+              "model_id": "",
+              "size": "1024x1024"
+            },
+            "position": {
+              "x": 340,
+              "y": 90
+            }
+          },
+          {
+            "id": "output",
+            "type": "media_output",
+            "label": "产物输出",
+            "params": {},
+            "position": {
+              "x": 640,
+              "y": 90
+            }
+          }
+        ],
+        "edges": [
+          {
+            "source": "prompt",
+            "target": "image"
+          },
+          {
+            "source": "image",
+            "target": "output"
+          }
+        ]
+      },
+      "project_id": null,
+      "builtin": true,
+      "revision": 1
+    },
+    {
+      "id": "builtin_video",
+      "name": "视频生成模板",
+      "description": "提示词 → 视频生成 → 产物输出",
+      "document": {
+        "schema_version": "1.0",
+        "name": "视频生成模板",
+        "nodes": [
+          {
+            "id": "prompt",
+            "type": "prompt_input",
+            "label": "提示词输入",
+            "params": {
+              "prompt": "描述主体动作、镜头运动和环境"
+            },
+            "position": {
+              "x": 40,
+              "y": 90
+            }
+          },
+          {
+            "id": "video",
+            "type": "video_generate",
+            "label": "视频生成",
+            "params": {
+              "model_id": "",
+              "size": "1280x720",
+              "seconds": 4
+            },
+            "position": {
+              "x": 340,
+              "y": 90
+            }
+          },
+          {
+            "id": "output",
+            "type": "media_output",
+            "label": "产物输出",
+            "params": {},
+            "position": {
+              "x": 640,
+              "y": 90
+            }
+          }
+        ],
+        "edges": [
+          {
+            "source": "prompt",
+            "target": "video"
+          },
+          {
+            "source": "video",
+            "target": "output"
+          }
+        ]
+      },
+      "project_id": null,
+      "builtin": true,
+      "revision": 1
+    },
+    {
+      "id": "builtin_image_video",
+      "name": "图片转视频模板",
+      "description": "先生成图片，将实际图片传给视频节点，再输出视频",
+      "document": {
+        "schema_version": "1.0",
+        "name": "图片转视频模板",
+        "nodes": [
+          {
+            "id": "prompt",
+            "type": "prompt_input",
+            "label": "提示词输入",
+            "params": {
+              "prompt": "先生成白鹭云海画面，再生成白鹭展翅的动作"
+            },
+            "position": {
+              "x": 40,
+              "y": 90
+            }
+          },
+          {
+            "id": "image",
+            "type": "image_generate",
+            "label": "图片生成",
+            "params": {
+              "model_id": "",
+              "size": "1024x1024"
+            },
+            "position": {
+              "x": 340,
+              "y": 90
+            }
+          },
+          {
+            "id": "video_prompt",
+            "type": "prompt_input",
+            "label": "视频动作描述",
+            "params": {
+              "prompt": "白鹭缓慢展翅，镜头平稳跟随"
+            },
+            "position": {
+              "x": 340,
+              "y": 310
+            }
+          },
+          {
+            "id": "video",
+            "type": "video_generate",
+            "label": "参考生成图片制作视频",
+            "params": {
+              "model_id": "",
+              "size": "1280x720",
+              "seconds": 4
+            },
+            "position": {
+              "x": 650,
+              "y": 90
+            }
+          },
+          {
+            "id": "output",
+            "type": "media_output",
+            "label": "产物输出",
+            "params": {},
+            "position": {
+              "x": 960,
+              "y": 90
+            }
+          }
+        ],
+        "edges": [
+          {
+            "source": "prompt",
+            "target": "image"
+          },
+          {
+            "source": "image",
+            "target": "video"
+          },
+          {
+            "source": "video_prompt",
+            "target": "video"
+          },
+          {
+            "source": "video",
+            "target": "output"
+          }
+        ]
+      },
+      "project_id": null,
+      "builtin": true,
+      "revision": 1
+    }
+  ]
+}

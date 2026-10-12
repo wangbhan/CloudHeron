@@ -2,7 +2,13 @@
 
 供团队使用的 AI 图片与视频创作平台，支持项目、对话 Agent、Skill 与专家组合、JSON 节点工作流、参考资产、模型接入和工作流 API。
 
-## 本地运行
+## 新版 FastAPI 后端
+
+后端 v0.2.0 位于 `backend`，采用 FastAPI + PostgreSQL + 私有 S3 对象存储。新版本机服务 http://127.0.0.1:8802，接口文档 http://127.0.0.1:8802/docs。
+
+[安装与云桶配置](backend/README.md) · [前端接口文档](docs/development/DOC-API-001-FastAPI接口与前端对接.md) · [迁移与切换](docs/release/DOC-REL-003-FastAPI启动迁移与切换.md)。真实云桶与旧业务数据切换待配置验收；原服务继续保留。
+
+## 旧版本本地运行
 
 需要 Node.js 24 或更高版本，无第三方运行依赖。
 
@@ -23,7 +29,7 @@ npm test
 
 ## 手动验收
 
-管理员或编辑者点击顶栏“手动测试”，载入测试项目。36 条用例可记录与导出结果；样例不调用模型。已有团队的预置项目继续使用。
+管理员或编辑者点击顶栏“手动测试”，载入测试项目。42 条用例可记录与导出结果；样例不调用模型。已有团队的预置项目继续使用。
 
 参考视频文件需上游支持视频输入，并在模型配置中启用“参考视频输入”，按接口说明配置格式与字段。兼容协议名称并不代表服务支持全部生成能力。
 
@@ -37,6 +43,6 @@ npm test
 
 ## Git 与 GitHub
 
-仓库根目录包括 app、docs、design 和 outputs 中的项目追踪表。app/data、.work、环境变量与密钥被忽略。运行 npm test 后提交代码。当前只初始化本地 Git；后续自行添加 GitHub remote 并推送。
+仓库根目录包括 backend、app、docs、design 和 outputs 中的项目追踪表。app/data、.work、环境变量与密钥被忽略。运行 npm test 后提交代码。当前只初始化本地 Git；后续自行添加 GitHub remote 并推送。
 
 正式生产上线尚未执行，参见 docs/release 的上线登记文档。
