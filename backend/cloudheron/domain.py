@@ -102,4 +102,3 @@ def copy_template(document,name,keep=False):
             for k in ('model_id','asset_id'):
                 if k in n['params']: n['params'][k]=''
     return doc
-

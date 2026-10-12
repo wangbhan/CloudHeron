@@ -43,4 +43,3 @@ def manual_workspace(s):
     except Exception:
         for file in created: s.context.storage.delete(file)
         raise
-

@@ -42,4 +42,3 @@ def permission(user,resource,edit=False):
     level=resource.get('acl',{}).get(user['id'])
     return resource['visibility']=='team' or (level=='edit' if edit else level in ('edit','read'))
 def clean_user(u): return {k:u[k] for k in ('id','name','email','role','active')}
-

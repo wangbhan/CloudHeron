@@ -34,4 +34,3 @@ class Database:
                     if not conn.execute('SELECT version FROM schema_migrations WHERE version=%s',(file.name,)).fetchone():
                         conn.execute(file.read_text());conn.execute('INSERT INTO schema_migrations(version) VALUES(%s)',(file.name,))
     def close(self): self.pool.close()
-

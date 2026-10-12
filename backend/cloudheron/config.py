@@ -33,4 +33,3 @@ class Settings(BaseSettings):
     def no_wildcard(cls, v):
         if any('*' in x or not x.startswith(('http://','https://')) for x in v): raise ValueError('CORS 须为明确的 HTTP(S) Origin')
         return v
-

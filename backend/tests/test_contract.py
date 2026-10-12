@@ -39,4 +39,3 @@ def test_openapi_explicit_paths_and_secrets():
 def test_postgres_required_and_explicit_cors():
     with pytest.raises(ValueError): Settings(database_url='sqlite:///file',vault_key_b64='x',s3_bucket='qa')
     with pytest.raises(ValueError): Settings(database_url='postgresql://localhost/test',vault_key_b64='x',s3_bucket='qa',cors_origins=['*'])
-

@@ -133,4 +133,3 @@ class Service:
         except Exception:
             self.context.storage.delete(key);raise
         return self.db.one('SELECT * FROM assets WHERE id=%s',aid)
-
