@@ -21,7 +21,7 @@ from .service import Service,asset_view,job_view,template_view
 from .worker import Worker
 from .provider import Provider
 
-VERSION='0.2.0';cookie_scheme=APIKeyCookie(name='cloudheron',auto_error=False);bearer_scheme=HTTPBearer(auto_error=False)
+VERSION='0.2.1';cookie_scheme=APIKeyCookie(name='cloudheron',auto_error=False);bearer_scheme=HTTPBearer(auto_error=False)
 def seed(d):
     skills=[('skill_visual','画面提示词','image','主体、环境、光线与构图：{{prompt}}'),('skill_motion','视频动作描述','video','明确主体动作与运镜，避免无关切换：{{prompt}}'),('skill_reference','参考资产注入','all','保持参考资产的外观、服装与风格。{{prompt}}'),('skill_structure','提示词结构整理','prompt','将创作要求组织为主体、环境、光线、构图或动作：{{prompt}}'),('skill_concise','提示词精炼','prompt','去除重复描述，只输出提示词：{{prompt}}')]
     for sid,name,task,t in skills: d.run('INSERT INTO skills(id,name,task,template,builtin) VALUES(%s,%s,%s,%s,true) ON CONFLICT(id) DO NOTHING',sid,name,task,t)
@@ -189,9 +189,9 @@ def create_app(settings:Settings|None=None):
         if not old: fail(404,'模型不存在')
         model_spec(b.spec);secret=old['secret'] if b.api_key is None else s.context.vault.encrypt(b.api_key)
         s.db.run('UPDATE models SET name=%s,spec=%s,secret=%s,enabled=%s,updated_at=now() WHERE id=%s',text(b.name,'模型名称'),Jsonb(b.spec),secret,b.enabled,model_id);return s.model_view(s.db.one('SELECT * FROM models WHERE id=%s',model_id))
-    @api.post('/models/{model_id}/check',response_model=dict,tags=['模型'])
+    @api.post('/models/{model_id}/check',response_model=ModelCheckOut,tags=['模型'])
     def check_model(model_id:str,s:Svc):
-        s.admin();m=s.model(model_id);result=Provider(settings,s.context.vault,s.context.storage,None).request(m,m['spec'].get('paths',{}).get('models','/models'));return {'ok':True,'models':[x['id'] for x in result.get('data',[])],'note':'服务连接成功；生成能力以实际任务为准'}
+        s.admin();m=s.model(model_id);return Provider(settings,s.context.vault,s.context.storage,None).check(m)
     @api.get('/task-options',response_model=dict,tags=['能力'])
     def task_options(s:Svc): return OPTIONS
     @api.get('/agents',response_model=list[AgentOut],tags=['能力'])

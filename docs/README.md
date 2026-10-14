@@ -1,6 +1,6 @@
 # 云鹭 · CloudHeron 文档入口
 
-当前为开发阶段：RAW-011 接受 v0.3.2 界面并授权实现功能。DEV-001 至 DEV-025 已登记，前端代码在 app/public，新版后端在 backend。剩余需求细节保留；42 条手动用例已登记；正式验收与生产上线待执行。
+当前为开发阶段：RAW-011 接受 v0.3.2 界面并授权实现功能。DEV-001 至 DEV-027 已登记，前端代码在 app/public，新版后端在 backend。剩余需求细节保留；45 条手动用例已登记；正式验收与生产上线待执行。
 
 - [DOC-GOV-001 编号与阶段规则](DOC-GOV-001-编号与阶段规则.md)
 - [DOC-RAW-001 原始需求](requirements/DOC-RAW-001-原始需求记录.md)
@@ -43,3 +43,8 @@
 - [DOC-REL-003 FastAPI启动迁移与切换](release/DOC-REL-003-FastAPI启动迁移与切换.md)
 
 新版运行8802，Swagger /docs。PostgreSQL本机验证完成，真实云桶与业务切换待执行；旧8800为保留的Node/SQLite版本。
+
+- [DOC-DES-012 模型连接与协议设计](design/DOC-DES-012-模型连接与协议设计.md)
+- [DOC-DEV-010 模型连接与协议实施](development/DOC-DEV-010-模型连接与协议实施.md)
+- [DOC-TST-008 模型连接与协议验证](testing/DOC-TST-008-模型连接与协议验证.md)
+- [DOC-REL-004 模型协议更新与验证](release/DOC-REL-004-模型协议更新与验证.md)

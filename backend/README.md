@@ -1,4 +1,4 @@
-# 云鹭 FastAPI 后端 v0.2.0
+# 云鹭 FastAPI 后端 v0.2.1
 
 Python 3.12、FastAPI、psycopg 连接池、PostgreSQL 17 和 boto3 S3 对象存储。业务数据、工作流 JSONB、权限、任务队列在 PostgreSQL；图片视频字节在私有桶。此实现不运行 Node 后端，也不以本地媒体目录作为运行存储。
 
@@ -57,7 +57,7 @@ cd /Users/bohan/work/AI漫剧/backend
 ../.work/backend-v020/venv/bin/python scripts/export_openapi.py
 ```
 
-30 项覆盖真实 PostgreSQL 事务、权限、任务去重、重启恢复、迁移、HTTP 模型调用和 S3 模拟器。不会调用收费模型。手动在新版顶栏“手动测试”点“重新载入测试项目”，执行 TST-037～042，并保存自己的实际结果。真实模型和真实云桶验证仍需要部署配置，参见 [测试记录](../docs/testing/DOC-TST-007-FastAPI迁移验证记录.md)。
+33 项覆盖真实 PostgreSQL 事务、权限、任务去重、重启恢复、迁移、HTTP 模型调用和 S3 模拟器。不会调用收费模型。手动在新版顶栏“手动测试”点“重新载入测试项目”，执行 TST-037～042，并保存自己的实际结果。真实模型和真实云桶验证仍需要部署配置，参见 [测试记录](../docs/testing/DOC-TST-007-FastAPI迁移验证记录.md)。
 
 ## 容器开发方案
 
@@ -68,3 +68,5 @@ cd /Users/bohan/work/AI漫剧/backend
 `/api/health` 检查数据库，`/api/ready` 同时检查数据库及桶；`/api/system/status` 仅管理员可查看并发与排队数量。SIGTERM 等当前任务结束，不再领取排队任务；重启接续 queued，已中断 running 标为失败，不自动重复付费调用。持有执行器锁的 PostgreSQL 连接丢失时停止领取与新提交，ready 返回503，需重启服务恢复。模型超时默认 180 秒，异步视频轮询上限 30 分钟，停止可能等待当前调用完成。
 
 生产通过 HTTPS 反向代理同源提供前端和 `/api`，设置 `COOKIE_SECURE=true`。独立前端使用明确的 `CORS_ORIGINS` JSON 数组、携带 Cookie 和保护头；当前前端使用相对 `/api`，推荐代理保持同源。生产数据库、桶和 Vault 密钥分别备份，云桶启用持久存储和供应商权限策略。
+
+模型配置新增文本OpenAI/Claude和官方vLLM-Omni视频风格；连接测试在模型行内显示进度和结果，默认10秒后端检测，15秒前端期限。用例TST-043～045，见DOC-DEV-010和DOC-TST-008。

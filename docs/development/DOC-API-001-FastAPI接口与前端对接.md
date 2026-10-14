@@ -1,6 +1,6 @@
 # DOC-API-001 FastAPI 接口与前端对接
 
-版本：v0.2.0；日期：2026-10-12。关联 REQ-040/041/042、DES-029/030/031、DEV-023/024/025、TST-037～042。63 个操作、51 个路径。完整机器契约 [backend/openapi.json](../../backend/openapi.json)；运行时 Swagger `http://127.0.0.1:8802/docs`，ReDoc `/redoc`。下表请求类型和响应类型对应 OpenAPI components/schemas，可导入 Apifox、Postman 或生成 TypeScript 类型。
+版本：v0.2.1；日期：2026-10-14。关联 REQ-040/041/042、DES-029/030/031、DEV-023/024/025、TST-037～042。63 个操作、51 个路径。完整机器契约 [backend/openapi.json](../../backend/openapi.json)；运行时 Swagger `http://127.0.0.1:8802/docs`，ReDoc `/redoc`。下表请求类型和响应类型对应 OpenAPI components/schemas，可导入 Apifox、Postman 或生成 TypeScript 类型。
 
 ## 前端调用约定
 
@@ -38,7 +38,7 @@ async function api(path, method='GET', body, requestKey) {
 {"name":"图像模型","api_key":"REPLACE_API_KEY","enabled":true,"spec":{"protocol":"OpenAI","base_url":"https://MODEL_HOST/v1","model":"MODEL_NAME","capabilities":["image","image_edit"],"paths":{"image":"/images/generations","edit":"/images/edits"},"extra":{}}}
 ```
 
-支持协议名 OpenAI/vLLM/vLLM-Omni/SGLang；capabilities 为 text/image/image_edit/video/video_reference。端点键的实际名称及默认路径由 provider.py 和管理页使用：文本 `text`，图片 `image`，编辑 `edit`，视频 `video`，视频状态 `video_status`，视频下载 `video_content`，列表 `models`。默认图片路径是 `/images/generations`。参考视频需 video_reference、配置 `video_format=json|multipart` 及 `reference_fields`，未填写使用管理页默认值。
+支持服务协议名 OpenAI/Claude/vLLM/vLLM-Omni/SGLang；capabilities 为 text/image/image_edit/video/video_reference。端点键的实际名称及默认路径由 provider.py 和管理页使用：文本 `text`，图片 `image`，编辑 `edit`，视频 `video`，视频状态 `video_status`，视频下载 `video_content`，列表 `models`。默认图片路径是 `/images/generations`。参考视频需 video_reference、配置 `video_format=json|multipart` 及 `reference_fields`，未填写使用管理页默认值。
 
 图片对话例：
 
@@ -90,7 +90,7 @@ curl -b /tmp/cloudheron-cookie -H 'X-CloudHeron: 1' -X POST \
 
 正常停机后 queued 保留、running 等待；进程异常后 running 标失败，不自动再次调用模型。首版单 API 进程，分页/分布式 Worker/WebSocket 尚未加入。独立前端部署优先同源反向代理；跨源配置明确 CORS_ORIGINS 并保证 Cookie 同站及 HTTPS。
 
-## 接口目录（由 v0.2.0 OpenAPI 生成）
+## 接口目录（由 v0.2.1 OpenAPI 生成）
 
 | 模块 | 方法与路径 | 鉴权 | JSON 请求类型 | 成功状态 / 响应类型 |
 | --- | --- | --- | --- | --- |
@@ -114,7 +114,7 @@ curl -b /tmp/cloudheron-cookie -H 'X-CloudHeron: 1' -X POST \
 | 模型 | `GET /api/models` | Cookie | — | 200 / list[ModelOut] |
 | 模型 | `POST /api/models` | Cookie | ModelWrite | 201 / ModelOut |
 | 模型 | `PUT /api/models/{model_id}` | Cookie | ModelWrite | 200 / ModelOut |
-| 模型 | `POST /api/models/{model_id}/check` | Cookie | — | 200 / object |
+| 模型 | `POST /api/models/{model_id}/check` | Cookie | — | 200 / ModelCheckOut |
 | 能力 | `GET /api/task-options` | Cookie | — | 200 / object |
 | 能力 | `GET /api/agents` | Cookie | — | 200 / list[AgentOut] |
 | 能力 | `GET /api/skills` | Cookie | — | 200 / list[SkillOut] |
@@ -159,3 +159,23 @@ curl -b /tmp/cloudheron-cookie -H 'X-CloudHeron: 1' -X POST \
 | 测试 | `POST /api/test-workspace` | Cookie | — | 200 / object |
 
 实现源：backend/cloudheron/main.py、routes.py、schemas.py。更新路由后运行 `python scripts/export_openapi.py`；前端与后端以导出的字段定义和契约测试保持一致。
+
+## v0.2.1 模型测试与任务格式（REQ-043/044）
+
+POST /api/models/{id}/check只读模型列表，管理员调用；HTTP200返回ModelCheckOut：{ok,status,note,elapsed_ms,models,model_available}。status=success|warning|failed；ok=false表示检测失败，前端应显示note，不能只按HTTP200判成功。model_available=false表示连通但当前列表未发现配置模型，可能是模型名/列表分页，显示警告。无权/未登录/模型停用按403/401/400处理。后端默认10秒可用MODEL_CHECK_TIMEOUT调整（最多15），前端15秒期限；只检查列表不生成。
+
+spec.text_format=openai|claude，默认openai；protocol=Claude未显式填格式时默认claude。Claude默认相对/messages，使用x-api-key和anthropic-version=2023-06-01，系统提示从messages移至顶层system，max_tokens默认1024，stop转换stop_sequences，从content[type=text]提取回复。当前为文本创作，未接入Claude工具调用与思考块历史；部分模型对temperature/top_p/输出长度仍有自身限制。依据[Claude Messages](https://platform.claude.com/docs/en/api/messages/create)。
+
+spec.video_style=openai|vllm_omni；旧规格默认openai，protocol=vLLM-Omni未显式风格时为vllm_omni。官方风格固定multipart/videos，最多一份参考文件，图片或视频都上传input_reference；num_frames/fps/guidance_scale_2/boundary_ratio/flow_shift为新增任务字段，num_frames显式填写时省略seconds。自定义模型扩展对象进入JSON编码的extra_params。异步id仍经/videos/{id}轮询和/content下载。模型特定帧数及采样限制需要上游支持，平台不替用户自动修正。依据[vLLM-Omni Videos API](https://docs.vllm.ai/projects/vllm-omni/en/v0.26.0/serving/videos_api/)。
+
+Claude保存示例：
+
+```json
+{"name":"Claude文本模型","api_key":"REPLACE_KEY","spec":{"protocol":"OpenAI","text_format":"claude","base_url":"https://TEXT_HOST/v1","model":"MODEL_NAME","capabilities":["text"],"paths":{}}}
+```
+
+官方视频示例：
+
+```json
+{"name":"Omni视频模型","spec":{"protocol":"vLLM-Omni","video_style":"vllm_omni","video_format":"multipart","base_url":"http://VIDEO_HOST:8091/v1","model":"MODEL_NAME","capabilities":["video","video_reference"],"paths":{}}}
+```

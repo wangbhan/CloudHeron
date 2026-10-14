@@ -34,6 +34,8 @@ def manual_workspace(s):
                 elif 'Agent' in c['title'] or '对话' in c['title']: entry='#create/'+workspace['chats']['image']
                 if c['id']=='TST-009': entry='#workflow/'+workspace['workflows']['error']
                 if c['id']=='TST-016': entry='#workflow/'+workspace['workflows']['reference']
+                if c['id'] in ('TST-043','TST-044'): entry='#models'
+                if c['id']=='TST-045': entry='#create/'+workspace['chats']['video']
                 if c['id']=='TST-014': entry='#create/'+workspace['chats']['prompt']
                 definition={**c,'entry_path':entry}
                 s.db.run('INSERT INTO project_test_cases(project_id,test_id,definition) VALUES(%s,%s,%s) ON CONFLICT(project_id,test_id) DO UPDATE SET definition=EXCLUDED.definition',pid,c['id'],Jsonb(definition))

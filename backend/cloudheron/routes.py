@@ -133,7 +133,7 @@ def register(api,Svc,Db,settings,**kwargs):
     def job(job_id:str,s:Svc): return job_view(s.resource('jobs',job_id))
     @api.get('/system/status',response_model=RuntimeOut,tags=['运行管理'])
     def system_status(s:Svc):
-        s.admin();return {'version':'0.2.0','state':'draining' if s.context.closing else 'ready','workers':s.context.worker.state(),'max_pending_per_user':settings.max_pending_per_user,'queued':s.db.one("SELECT count(*) n FROM jobs WHERE status='queued'")['n'],'running':s.db.one("SELECT count(*) n FROM jobs WHERE status='running'")['n']}
+        s.admin();return {'version':'0.2.1','state':'draining' if s.context.closing else 'ready','workers':s.context.worker.state(),'max_pending_per_user':settings.max_pending_per_user,'queued':s.db.one("SELECT count(*) n FROM jobs WHERE status='queued'")['n'],'running':s.db.one("SELECT count(*) n FROM jobs WHERE status='running'")['n']}
     @api.get('/publications',response_model=list[PublicationOut],tags=['发布 API'])
     def publications(s:Svc): return [{k:v for k,v in p.items() if k not in ('key_hash','document')} for p in s.db.all('SELECT * FROM publications ORDER BY created_at DESC') if permission(s.user,s.db.one('SELECT * FROM projects WHERE id=%s',p['project_id']))]
     @api.post('/publications',response_model=PublicationCreated,status_code=201,tags=['发布 API'])

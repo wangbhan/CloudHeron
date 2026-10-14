@@ -1,0 +1,82 @@
+CloudHeron v0.2.1 — 2026-10-14
+Python real PostgreSQL / Moto S3 / HTTP fixtures
+.................................                                        [100%]
+=============================== warnings summary ===============================
+../.work/backend-v020/venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /Users/bohan/work/AI漫剧/.work/backend-v020/venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+33 passed, 1 warning in 3.29s
+
+Legacy/shared frontend regression
+
+> cloudheron@0.1.6 test
+> node --test tests/*.test.mjs
+
+✔ 任务参数保留零和 JSON 类型、覆盖模型默认值并省略空值 (1.929958ms)
+✔ 非法数值、JSON、字段覆盖与自定义参考冲突在发请求前被拒绝 (1.344083ms)
+✔ 旧工作流与未填选项保持兼容，额外参数不会改变原对象 (0.261958ms)
+✔ 后端运行参数限制与目录锁 (38.678958ms)
+▶ 后端实际 HTTP、队列、重启与幂等提交
+  ✔ 公开健康检查无敏感信息；运行状态仅管理员访问 (2.576125ms)
+  ✔ 同时重复对话提交只产生一次调用、消息和任务 (18.087375ms)
+  ✔ 工作流旧版本重放、账号隔离、API 固定版本去重 (19.71325ms)
+  ✔ 并发一、pending 上限二；重放不消耗队列配额 (14.763209ms)
+  ✔ 非法幂等键和事务失败均不遗留任务或对话输入 (3.175958ms)
+  ✔ 正常停机等待当前任务，queued 保留，重启自动接续 (19.239291ms)
+  ✔ 中断的运行任务失败并定位节点；对话提示一次且不自动重试 (5.019625ms)
+  ✔ 终态与对话完成消息同事务；失败键重放不再次调用模型 (9.406625ms)
+  ✔ 项目权限撤销后既有键不绕过授权 (16.951791ms)
+✔ 后端实际 HTTP、队列、重启与幂等提交 (242.58075ms)
+✔ 启动脚本、健康探测和 SIGTERM 实际子进程验证 (140.805834ms)
+▶ 真实 HTTP 与 SQLite 集成（上游仅为测试夹具）
+  ✔ 首次初始化只允许一次，认证持久化且会话不含密码 (84.893209ms)
+  ✔ 一次性邀请与查看者权限上限 (83.254709ms)
+  ✔ 项目与资产访问隔离，ACL 编辑受角色限制 (4.399083ms)
+  ✔ 模型凭据加密、掩码、连接测试，编辑者无配置权限 (3.534833ms)
+  ✔ JSON 保存、版本冲突与查看者禁止运行 (1.982792ms)
+  ✔ AI 分析不改配置；整批确认只修改，不执行任务 (5.783667ms)
+  ✔ 显式运行生成媒体，项目产物区分来源 (26.632416ms)
+  ✔ 对话历史、Skill 与视频异步轮询传递参考文件 (26.072542ms)
+  ✔ 工作流报错定位到节点，反射密钥被隐藏 (25.033166ms)
+  ✔ JSON 导入校验不存储；有效资产新版本不覆盖原媒体 (3.458083ms)
+  ✔ 图片参考编辑与提示词 Agent 实际走上游接口 (49.521ms)
+  ✔ API 固定快照、异步生成、下载隔离与撤销 (28.261333ms)
+  ✔ 手动测试工作区幂等，示例不执行模型，查看者不能载入 (9.421292ms)
+  ✔ 专家管理校验、多个 Skill 按顺序组合去重并持久化对话配置 (50.975416ms)
+  ✔ 视频文件参考在对话和工作流中传递；JSON 与 multipart 可配置 (75.135583ms)
+  ✔ 三个 Agent 可选择全部内置 Skill (73.384666ms)
+  ✔ 提示词工作流节点实际应用所选 Skill (24.995583ms)
+  ✔ 任务参数 schema 与图片对话传递；多图保存及历史配置 (27.30975ms)
+  ✔ 视频对话 multipart/JSON 参数、参考文件与类型正确传递 (53.005ms)
+  ✔ 提示词对话、工作流文本/图像节点和 AI 助手均传递配置 (109.773584ms)
+  ✔ 非法参数不创建任务或历史；上游不支持参数返回真实错误 (31.355209ms)
+  ✔ 停用成员撤销已有会话，最后管理员受到保护 (2.23225ms)
+  ✔ SQLite 与加密密钥可以重新打开；没有预填演示项目 (4.892834ms)
+✔ 真实 HTTP 与 SQLite 集成（上游仅为测试夹具） (825.48875ms)
+✔ 内置模板有效，复制保留结构且默认清空绑定 (0.827625ms)
+▶ 模板与版本的 HTTP、权限及升级回归
+  ✔ 模板复用创建独立工作流和首版，零任务副作用 (3.477208ms)
+  ✔ 保存模板固定 JSON，来源修改与副本修改均相互独立 (4.098417ms)
+  ✔ 恢复生成新版本，旧记录与 API 快照固定，冲突不新增记录 (3.538417ms)
+  ✔ 私有模板与历史隔离，查看者可预览但禁止复用恢复 (5.097208ms)
+  ✔ 默认清空失效模型，选择保留时重新校验且失败不创建 (6.063083ms)
+  ✔ 升级只登记现有当前版本；重启不重复，测试工作区创建即有历史 (8.65025ms)
+✔ 模板与版本的 HTTP、权限及升级回归 (171.514875ms)
+✔ 工作流拒绝循环、重复编号和端口类型不匹配 (1.508833ms)
+✔ 执行器使用连线提示词、传递真实引用并在失败节点停止 (0.765708ms)
+✔ 查看者权限上限、密码与密钥往返 (78.653375ms)
+ℹ tests 50
+ℹ suites 0
+ℹ pass 50
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 906.016167
+
+Browser DOM: immediate running feedback, success, redacted HTTP401, timeout, Claude save/reload, vLLM-Omni multipart save/reload and task field visibility passed. Screenshot capture timed out; no screenshot visual claim.
+Live8802 ready0.2.1; online/exported OpenAPI match and schema validation passed.
+Workbook44 requirements,33 designs,27 development tasks,45 tests,3 release records,38 documents,415 links; human8pass2fail unchanged;35pending; formula errors0.
+Real providers/output quality, cloud bucket and production remain pending.

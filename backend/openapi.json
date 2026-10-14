@@ -3,7 +3,7 @@
   "info": {
     "title": "云鹭 · CloudHeron API",
     "description": "FastAPI + PostgreSQL + 私有 S3 对象存储。会话 Cookie 或发布 API Bearer 鉴权。写请求需 X-CloudHeron: 1。",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "paths": {
     "/api/health": {
@@ -3262,9 +3262,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "additionalProperties": true,
-                  "title": "Response Check Model Api Models  Model Id  Check Post"
+                  "$ref": "#/components/schemas/ModelCheckOut"
                 }
               }
             }
@@ -11228,6 +11226,58 @@
           "team"
         ],
         "title": "MeOut"
+      },
+      "ModelCheckOut": {
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "title": "Ok"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "success",
+              "warning",
+              "failed"
+            ],
+            "title": "Status"
+          },
+          "note": {
+            "type": "string",
+            "title": "Note"
+          },
+          "elapsed_ms": {
+            "type": "integer",
+            "title": "Elapsed Ms"
+          },
+          "models": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Models"
+          },
+          "model_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ok",
+          "status",
+          "note",
+          "elapsed_ms",
+          "models"
+        ],
+        "title": "ModelCheckOut"
       },
       "ModelOut": {
         "properties": {

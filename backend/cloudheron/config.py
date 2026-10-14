@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     workers: int = Field(2, ge=1, le=8)
     max_pending_per_user: int = Field(10, ge=1, le=100)
     poll_seconds: float = Field(2.5, gt=0, le=60)
+    model_check_timeout: float = Field(10, ge=.05, le=15)
     model_timeout: float = Field(180, gt=0, le=180)
     @field_validator('database_url')
     @classmethod

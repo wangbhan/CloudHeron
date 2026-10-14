@@ -30,13 +30,20 @@ def env():
     settings=settings.model_copy(update={'database_url':test_url,'s3_bucket':'cloudheron-qa-'+os.urandom(5).hex(),'s3_create_bucket':True,'poll_seconds':.01,'workers':1,'max_pending_per_user':3})
     database=Database(test_url);database.migrate()
     with database.connection() as conn: conn.execute(sql.SQL('TRUNCATE {} CASCADE').format(sql.SQL(',').join(sql.Identifier(t) for t in TABLES)))
-    database.close();state={'received':[],'proposal':None,'hold':None}
+    database.close();state={'received':[],'proposal':None,'hold':None,'probe':'success','probes':[]}
     class Handler(BaseHTTPRequestHandler):
         def log_message(self,*args): pass
         def output(self,data,status=200,mime='application/json'):
-            self.send_response(status);self.send_header('Content-Type',mime);self.end_headers();self.wfile.write(data if isinstance(data,bytes) else json.dumps(data).encode())
+            self.send_response(status);self.send_header('Content-Type',mime);self.end_headers()
+            try:self.wfile.write(data if isinstance(data,bytes) else json.dumps(data).encode())
+            except (BrokenPipeError,ConnectionResetError):pass
         def do_GET(self):
-            if self.path=='/v1/models':return self.output({'data':[{'id':'fixture'}]})
+            if self.path=='/v1/models':
+                state['probes'].append(dict(self.headers))
+                if state['probe']=='fail':return self.output({'error':'x-api-key fixture-secret'},401)
+                if state['probe']=='slow':time.sleep(.25)
+                if state['probe']=='invalid':return self.output({'other':[]})
+                return self.output({'data':[{'id':'fixture'}]})
             if self.path=='/v1/videos/fixture-video':return self.output({'id':'fixture-video','status':'completed'})
             if self.path=='/v1/videos/fixture-video/content':return self.output(VIDEO,mime='video/mp4')
             return self.output({},404)
@@ -49,8 +56,9 @@ def env():
                     if part.get_filename():files[key]=data
                     else:body[key]=data.decode()
             else:body=json.loads(raw)
-            state['received'].append({'path':self.path,'body':body,'files':files})
+            state['received'].append({'path':self.path,'body':body,'files':files,'headers':dict(self.headers)})
             if state['hold']:state['hold'].wait(10)
+            if self.path=='/v1/messages':return self.output({'content':[{'type':'thinking','thinking':'hidden'},{'type':'text','text':'Claude 夹具提示词'}]})
             if self.path=='/v1/chat/completions':return self.output({'choices':[{'message':{'content':json.dumps({'explanation':'雨夜改晨光','document':state['proposal']}) if 'explanation' in body['messages'][0]['content'] else '夹具晨光提示词'}}]})
             if body.get('fixture_fail'):return self.output({'error':'unsupported fixture_fail Bearer fixture-secret'},422)
             if self.path.startswith('/v1/images/'):return self.output({'data':[{'b64_json':base64.b64encode(PNG).decode()} for _ in range(int(body.get('n',1)))]})
@@ -215,6 +223,48 @@ def test_request_and_completion_transactions(env):
         count=len(env['state']['received']);again=c.post('/api/chats/'+cid+'/messages',json={'prompt':'终态','config':config(env)},headers={'Idempotency-Key':'terminal-fail'});assert again.json()['id']==j['id'];assert len(env['state']['received'])==count
     finally:
         with ctx.database.connection() as conn:conn.execute('DROP TRIGGER fixture_terminal ON jobs;DROP FUNCTION fixture_reject_terminal();')
+
+def test_connection_result_success_warning_failure_and_timeout(env):
+    c=env['client'];ctx=env['app'].state.ctx;mid=env['model']['id']
+    r=c.post('/api/models/'+mid+'/check',json={});assert r.status_code==200;assert r.json()['status']=='success';assert r.json()['model_available'] is True;assert 'elapsed_ms' in r.json()
+    assert env['viewer'].post('/api/models/'+mid+'/check',json={}).status_code==403
+    old=ctx.settings.model_check_timeout
+    try:
+        for mode in ('fail','invalid','slow'):
+            env['state']['probe']=mode;ctx.settings.model_check_timeout=.05 if mode=='slow' else old
+            start=time.monotonic();r=c.post('/api/models/'+mid+'/check',json={});assert r.status_code==200;assert r.json()['ok'] is False;assert r.json()['status']=='failed';assert 'fixture-secret' not in r.text
+            if mode=='slow':assert time.monotonic()-start<1
+        env['state']['probe']='success';ctx.settings.model_check_timeout=old
+        changed={**env['spec'],'model':'not-in-list'};model=c.post('/api/models',json={'name':'列表警告','spec':changed}).json()
+        r=c.post('/api/models/'+model['id']+'/check',json={});assert r.json()['status']=='warning';assert r.json()['model_available'] is False
+    finally:env['state']['probe']='success';ctx.settings.model_check_timeout=old
+
+def test_claude_messages_auth_system_options_and_agent(env):
+    c=env['client'];spec={**env['spec'],'capabilities':['text'],'text_format':'claude'}
+    r=c.post('/api/models',json={'name':'Claude 夹具','spec':spec,'api_key':'fixture-secret'});assert r.status_code==201;mid=r.json()['id']
+    checked=c.post('/api/models/'+mid+'/check',json={});assert checked.json()['status']=='success';headers=env['state']['probes'][-1];assert headers['x-api-key']=='fixture-secret';assert headers['anthropic-version']=='2023-06-01';assert 'Authorization' not in headers
+    cid=chat(env,'Claude');r=c.post('/api/chats/'+cid+'/messages',json={'prompt':'测试Claude','config':{'agent':'prompt','model_id':mid,'max_tokens':64,'temperature':0,'stop':['END']}});assert r.status_code==202;assert call_job(env,r.json()['id'])['status']=='completed'
+    received=env['state']['received'][-1];body=received['body'];assert received['path']=='/v1/messages';assert body['system'];assert all(m['role']!='system' for m in body['messages']);assert body['max_tokens']==64;assert body['temperature']==0;assert body['stop_sequences']==['END'];assert 'stop' not in body
+    assert c.get('/api/chats/'+cid).json()['messages'][-1]['text']=='Claude 夹具提示词'
+    from cloudheron.provider import Provider
+    with env['app'].state.ctx.database.connection() as conn:
+        from cloudheron.service import Service
+        s=Service(DB(conn),env['app'].state.ctx,c.get('/api/me').json()['user']);model=s.model(mid)
+        adapter=Provider(env['settings'],s.context.vault,s.context.storage,None)
+        assert adapter.chat(model,[{'role':'user','content':'default'}])=='Claude 夹具提示词';assert env['state']['received'][-1]['body']['max_tokens']==1024
+        with pytest.raises(ValueError,match='不支持'):adapter.chat(model,[{'role':'user','content':'bad'}],{'presence_penalty':1})
+        assert adapter.chat(env['model']|{'secret':s.context.vault.encrypt('fixture-secret')},[{'role':'user','content':'OpenAI'}])=='夹具晨光提示词'
+
+def test_vllm_omni_video_frames_reference_and_extensions(env):
+    c=env['client'];spec={**env['spec'],'protocol':'vLLM-Omni','video_style':'vllm_omni','video_format':'multipart','capabilities':['video','video_reference']}
+    r=c.post('/api/models',json={'name':'Omni 视频夹具','spec':spec,'api_key':'fixture-secret'});assert r.status_code==201;mid=r.json()['id']
+    assert c.post('/api/models',json={'name':'错误JSON','spec':{**spec,'video_format':'json'}}).status_code==400
+    cfg={'agent':'video','model_id':mid,'asset_ids':[env['asset']['id']],'size':'832x480','seconds':4,'num_frames':81,'fps':16,'guidance_scale_2':4,'boundary_ratio':.875,'flow_shift':5,'api_params':{'extra_params':{'sample_solver':'euler'},'custom_flag':False}}
+    for reference in ('image','video'):
+        if reference=='video':
+            a=c.post('/api/assets',json={'project_id':env['project']['id'],'name':'视频参考','kind':'video','visibility':'team','mime':'video/mp4','filename':'ref.mp4','base64':base64.b64encode(VIDEO).decode()});assert a.status_code==201;cfg['asset_ids']=[a.json()['id']]
+        cid=chat(env,'Omni '+reference);r=c.post('/api/chats/'+cid+'/messages',json={'prompt':'视频测试','config':cfg});assert r.status_code==202;assert call_job(env,r.json()['id'])['status']=='completed'
+        got=next(x for x in reversed(env['state']['received']) if x['path']=='/v1/videos');assert got['files']['input_reference']==(PNG if reference=='image' else VIDEO);assert len(got['files'])==1;assert got['body']['num_frames']=='81';assert 'seconds' not in got['body'];assert got['body']['fps']=='16';assert got['body']['guidance_scale_2']=='4';extras=json.loads(got['body']['extra_params']);assert extras['sample_solver']=='euler';assert extras['custom_flag'] is False;assert 'custom_flag' not in got['body']
 
 def test_pg_single_executor_and_restart_queue(env):
     with pytest.raises(RuntimeError,match='已有云鹭执行器'):

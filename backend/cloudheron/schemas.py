@@ -57,3 +57,6 @@ class HealthOut(BaseModel): status:Literal['ok','ready','draining'];version:str;
 class RuntimeOut(BaseModel): version:str;state:str;workers:dict[str,Any];max_pending_per_user:int;queued:int;running:int
 class BootstrapOut(BaseModel): setup_required:bool;team:str;node_types:dict[str,Any]
 class AgentOut(BaseModel): id:str;name:str;description:str;model_capability:str;fields:list[str];defaults:dict[str,Any]
+
+class ModelCheckOut(BaseModel):
+    ok:bool;status:Literal['success','warning','failed'];note:str;elapsed_ms:int;models:list[str];model_available:bool|None=None

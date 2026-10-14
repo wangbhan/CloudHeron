@@ -45,6 +45,7 @@ export function seedManualWorkspace(d,u){
       'TST-004':'#workflow/'+out.workflows.image,'TST-005':'#workflow/'+out.workflows.image,'TST-006':'#workflow/'+out.workflows.image,
       'TST-007':'#workflow/'+out.workflows.image,'TST-008':'#workflow/'+out.workflows.image,'TST-009':'#workflow/'+out.workflows.error,
       'TST-010':'#workflow/'+out.workflows.image,'TST-011':'#create/'+out.chats.image,'TST-012':'#skills','TST-013':'#create/'+out.chats.image,
+      'TST-043':'#models','TST-044':'#models','TST-045':'#create/'+out.chats.video,
       'TST-014':'#create/'+out.chats.prompt,'TST-015':'#create/'+out.chats.video,'TST-016':'#workflow/'+out.workflows.reference,
       'TST-017':'#projects/'+out.project_id,'TST-018':'#team','TST-019':'#api','TST-020':'#testing/'+out.project_id,'TST-021':'#workflow','TST-022':'#create/'+out.chats.image,'TST-023':'#create/'+out.chats.video,'TST-024':'#workflow/templates','TST-025':'#workflow/'+out.workflows.image,'TST-026':'#workflow/'+out.workflows.image,'TST-027':'#workflow/'+out.workflows.image,'TST-028':'#workflow/'+out.workflows.image,'TST-029':'#create/'+out.chats.image,'TST-030':'#create/'+out.chats.video,'TST-031':'#workflow/'+out.workflows.image,'TST-032':'#workflow/'+out.workflows.image
     };
