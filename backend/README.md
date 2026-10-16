@@ -1,8 +1,8 @@
-# 云鹭 FastAPI 后端 v0.2.1
+# 云鹭 FastAPI 后端 v0.2.2
 
 Python 3.12、FastAPI、psycopg 连接池、PostgreSQL 17 和 boto3 S3 对象存储。业务数据、工作流 JSONB、权限、任务队列在 PostgreSQL；图片视频字节在私有桶。此实现不运行 Node 后端，也不以本地媒体目录作为运行存储。
 
-需求 REQ-040～042 → DES-029～031 → DEV-023～025 → TST-037～042 → REL-002。接口说明见 [DOC-API-001](../docs/development/DOC-API-001-FastAPI接口与前端对接.md)，切换流程见 [DOC-REL-003](../docs/release/DOC-REL-003-FastAPI启动迁移与切换.md)。
+需求 REQ-040～042 → DES-029～031 → DEV-023～025 → TST-037～046 → REL-002。接口说明见 [DOC-API-001](../docs/development/DOC-API-001-FastAPI接口与前端对接.md)，切换流程见 [DOC-REL-003](../docs/release/DOC-REL-003-FastAPI启动迁移与切换.md)。
 
 ## 安装与云服务配置
 
@@ -22,11 +22,11 @@ chmod 600 .env
 CLOUDHERON_PYTHON=.venv/bin/python sh scripts/start.sh
 ```
 
-打开 http://127.0.0.1:8802；首次空库创建自己的团队管理员。Swagger：http://127.0.0.1:8802/docs，ReDoc：`/redoc`，规范：`/openapi.json`。启动自动执行 `migrations/001_initial.sql`，执行器每库一个 API 进程（Uvicorn `--workers 1`）；`WORKERS` 控制该进程中的任务并发，默认 2，不是 Uvicorn 进程数。
+打开 http://127.0.0.1:8800；首次空库创建自己的团队管理员。Swagger：http://127.0.0.1:8800/docs，ReDoc：`/redoc`，规范：`/openapi.json`。启动自动执行 `migrations/001_initial.sql`，执行器每库一个 API 进程（Uvicorn `--workers 1`）；`WORKERS` 控制该进程中的任务并发，默认 2，不是 Uvicorn 进程数。
 
 ## 当前机器的开发环境
 
-本次本机 Python 位于 `../.work/backend-v020/venv/bin/python`，已有忽略 Git 的 `.env`。专用 PostgreSQL 在 55432，数据位于 `../.work/backend-v020/postgres-data`。主服务 8802 使用 `cloudheron` 数据库。原来 Node/SQLite 服务 8800 及数据仍保留，尚未切换业务数据。
+本次本机 Python 位于 `../.work/backend-v020/venv/bin/python`，已有忽略 Git 的 `.env`。专用 PostgreSQL 在 55432，数据位于 `../.work/backend-v020/postgres-data`。主服务 8800 使用 `cloudheron` 数据库。旧Node/SQLite实现和数据仍保留，默认端口改为8801；当前主服务沿用原8802使用的PostgreSQL，不做SQLite隐式合并。
 
 59000 是 Moto 的 S3 HTTP 模拟器，仅用于接口验证；它的对象在进程退出后丢失。它不是云桶，也不是持久存储上线方案。不要向它迁移日常业务数据。当前开发服务需要该模拟器运行，真实部署填写真实桶配置。
 
@@ -57,11 +57,11 @@ cd /Users/bohan/work/AI漫剧/backend
 ../.work/backend-v020/venv/bin/python scripts/export_openapi.py
 ```
 
-33 项覆盖真实 PostgreSQL 事务、权限、任务去重、重启恢复、迁移、HTTP 模型调用和 S3 模拟器。不会调用收费模型。手动在新版顶栏“手动测试”点“重新载入测试项目”，执行 TST-037～042，并保存自己的实际结果。真实模型和真实云桶验证仍需要部署配置，参见 [测试记录](../docs/testing/DOC-TST-007-FastAPI迁移验证记录.md)。
+35 项覆盖真实 PostgreSQL 事务、权限、任务去重、重启恢复、迁移、HTTP 模型调用和 S3 模拟器。不会调用收费模型。手动在新版顶栏“手动测试”点“重新载入测试项目”，执行 TST-037～046，并保存自己的实际结果。真实模型和真实云桶验证仍需要部署配置，参见 [测试记录](../docs/testing/DOC-TST-007-FastAPI迁移验证记录.md)。
 
 ## 容器开发方案
 
-`compose.yaml` 提供 PostgreSQL + 持久 MinIO + API 的开发组合；根目录 `.dockerignore` 排除本地数据与 `.env`。本次 Docker 引擎未成功启动，容器镜像构建和 Compose 运行尚未验证。运行前停止占用 55432/59000/8802 的本机开发实例，再在 backend 执行 `docker compose --env-file .env up --build -d`。此配置创建本地私有桶，与真实云桶部署分开。
+`compose.yaml` 提供 PostgreSQL + 持久 MinIO + API 的开发组合；根目录 `.dockerignore` 排除本地数据与 `.env`。本次 Docker 引擎未成功启动，容器镜像构建和 Compose 运行尚未验证。运行前停止占用 55432/59000/8800 的本机开发实例，再在 backend 执行 `docker compose --env-file .env up --build -d`。此配置创建本地私有桶，与真实云桶部署分开。
 
 ## 运行约束
 
@@ -70,3 +70,11 @@ cd /Users/bohan/work/AI漫剧/backend
 生产通过 HTTPS 反向代理同源提供前端和 `/api`，设置 `COOKIE_SECURE=true`。独立前端使用明确的 `CORS_ORIGINS` JSON 数组、携带 Cookie 和保护头；当前前端使用相对 `/api`，推荐代理保持同源。生产数据库、桶和 Vault 密钥分别备份，云桶启用持久存储和供应商权限策略。
 
 模型配置新增文本OpenAI/Claude和官方vLLM-Omni视频风格；连接测试在模型行内显示进度和结果，默认10秒后端检测，15秒前端期限。用例TST-043～045，见DOC-DEV-010和DOC-TST-008。
+
+## 统一后台管理（v0.2.2）
+
+在项目根目录执行`./start.sh`，自动选择backend/.venv或当前.work/backend-v020/venv解释器，启动后台监督进程。`./start.sh status`返回ready/starting/unready/stopping/stopped，含端口、日志、进程和恢复次数；`./start.sh stop`正常停止。电脑重启后需再执行一次start，未安装登录自启。后台子API退出会重新启动；遇到其它进程占用8800时明确拒绝，不接管它。
+
+DEV_STORAGE=external默认使用配置的外部依赖；DEV_STORAGE=moto仅允许当前本机http://127.0.0.1:59000开发配置，并在需要时启动Moto、恢复专用PG。Moto退出恢复会丢失原内存对象，这是开发限制；正式部署使用云桶或已验收的持久MinIO，不使用Moto。仅停止脚本自行启动的Moto，不停止已有外部服务或PostgreSQL。停止生成需等API当前任务完成，管理命令超过10秒会显示stopping，稍后用status查看。
+
+底层`scripts/start.sh`仍为前台启动、默认8800，可通过PORT指定其它端口；测试使用独立端口/数据库/状态目录。不要把两个API连接到同一业务数据库同时运行。

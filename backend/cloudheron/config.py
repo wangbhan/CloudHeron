@@ -1,10 +1,12 @@
 from pathlib import Path
+from typing import Literal
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import Field, field_validator
 
 ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', extra='ignore', case_sensitive=False)
+    dev_storage: Literal["external","moto"] = "external"
     database_url: str
     vault_key_b64: str
     s3_bucket: str

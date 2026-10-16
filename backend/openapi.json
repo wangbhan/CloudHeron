@@ -3,7 +3,7 @@
   "info": {
     "title": "云鹭 · CloudHeron API",
     "description": "FastAPI + PostgreSQL + 私有 S3 对象存储。会话 Cookie 或发布 API Bearer 鉴权。写请求需 X-CloudHeron: 1。",
-    "version": "0.2.1"
+    "version": "0.2.2"
   },
   "paths": {
     "/api/health": {

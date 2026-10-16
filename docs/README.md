@@ -1,6 +1,6 @@
 # 云鹭 · CloudHeron 文档入口
 
-当前为开发阶段：RAW-011 接受 v0.3.2 界面并授权实现功能。DEV-001 至 DEV-027 已登记，前端代码在 app/public，新版后端在 backend。剩余需求细节保留；45 条手动用例已登记；正式验收与生产上线待执行。
+当前为开发阶段：RAW-011 接受 v0.3.2 界面并授权实现功能。DEV-001 至 DEV-028 已登记，前端代码在 app/public，新版后端在 backend。剩余需求细节保留；46 条手动用例已登记；正式验收与生产上线待执行。
 
 - [DOC-GOV-001 编号与阶段规则](DOC-GOV-001-编号与阶段规则.md)
 - [DOC-RAW-001 原始需求](requirements/DOC-RAW-001-原始需求记录.md)
@@ -48,3 +48,10 @@
 - [DOC-DEV-010 模型连接与协议实施](development/DOC-DEV-010-模型连接与协议实施.md)
 - [DOC-TST-008 模型连接与协议验证](testing/DOC-TST-008-模型连接与协议验证.md)
 - [DOC-REL-004 模型协议更新与验证](release/DOC-REL-004-模型协议更新与验证.md)
+
+- [DOC-DES-013 统一入口与服务管理设计](design/DOC-DES-013-统一入口与服务管理设计.md)
+- [DOC-DEV-011 统一入口与后台管理实施](development/DOC-DEV-011-统一入口与后台管理实施.md)
+- [DOC-TST-009 统一入口与后台验证](testing/DOC-TST-009-统一入口与后台验证.md)
+- [DOC-REL-005 统一8800启动与回滚](release/DOC-REL-005-统一8800启动与回滚.md)
+
+当前统一主入口8800，使用原8802的PostgreSQL；旧Node8801。上方历史记录的8802为当时端口，当前步骤以根README和DOC-REL-005为准。

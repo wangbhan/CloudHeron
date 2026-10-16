@@ -3,7 +3,8 @@ import base64,secrets,os
 root=Path(__file__).resolve().parents[1];target=root/'.env'
 if target.exists(): raise SystemExit('已有 .env，保留现有配置')
 pg=secrets.token_urlsafe(24);access='dev-'+secrets.token_hex(8);secret=secrets.token_urlsafe(32)
-value=f'''DATABASE_URL=postgresql://cloudheron:{pg}@127.0.0.1:55432/cloudheron
+value=f'''DEV_STORAGE=moto
+DATABASE_URL=postgresql://cloudheron:{pg}@127.0.0.1:55432/cloudheron
 POSTGRES_PASSWORD={pg}
 VAULT_KEY_B64={base64.b64encode(secrets.token_bytes(32)).decode()}
 S3_ENDPOINT_URL=http://127.0.0.1:59000

@@ -266,7 +266,7 @@ export function createApp({dataDir=process.env.CLOUDHERON_DATA||join(root,'data'
   return {server,db:d,close};
 }
 if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url)){
-  const app=createApp(),port=integerSetting(process.env.PORT??8800,'PORT',1,65535),host=process.env.HOST||'127.0.0.1';
+  const app=createApp(),port=integerSetting(process.env.PORT??8801,'PORT',1,65535),host=process.env.HOST||'127.0.0.1';
   app.server.listen(port,host,()=>console.log(`云鹭 · CloudHeron http://${host}:${port}`));
   const shutdown=()=>{app.close().catch(e=>{console.error(e.message);process.exitCode=1;});};
   process.once('SIGTERM',shutdown);process.once('SIGINT',shutdown);

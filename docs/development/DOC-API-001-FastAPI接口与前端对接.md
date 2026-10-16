@@ -1,6 +1,6 @@
 # DOC-API-001 FastAPI 接口与前端对接
 
-版本：v0.2.1；日期：2026-10-14。关联 REQ-040/041/042、DES-029/030/031、DEV-023/024/025、TST-037～042。63 个操作、51 个路径。完整机器契约 [backend/openapi.json](../../backend/openapi.json)；运行时 Swagger `http://127.0.0.1:8802/docs`，ReDoc `/redoc`。下表请求类型和响应类型对应 OpenAPI components/schemas，可导入 Apifox、Postman 或生成 TypeScript 类型。
+版本：v0.2.2；日期：2026-10-16。关联 REQ-040/041/042、DES-029/030/031、DEV-023/024/025、TST-037～042。63 个操作、51 个路径。完整机器契约 [backend/openapi.json](../../backend/openapi.json)；运行时 Swagger `http://127.0.0.1:8800/docs`，ReDoc `/redoc`。下表请求类型和响应类型对应 OpenAPI components/schemas，可导入 Apifox、Postman 或生成 TypeScript 类型。
 
 ## 前端调用约定
 
@@ -65,8 +65,8 @@ POST assets 上传 JSON `{project_id,name,kind,visibility,mime,filename,base64,d
 curl -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -H 'Idempotency-Key: my-one-request-001' \
   -d '{"prompt":"白鹭飞过云海"}' \
-  http://127.0.0.1:8802/api/v1/endpoints/ENDPOINT_ID/runs
-curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8802/api/v1/runs/JOB_ID
+  http://127.0.0.1:8800/api/v1/endpoints/ENDPOINT_ID/runs
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8800/api/v1/runs/JOB_ID
 ```
 
 第三方 ApiJobOut.outputs 是 `{asset_id,url}` 数组，url 不是会话媒体 URL。下载请求携带同一 Bearer。发布者停用或失去项目编辑权限后调用拒绝。
@@ -78,10 +78,10 @@ curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8802/api/v1/runs/JOB_ID
 curl -c /tmp/cloudheron-cookie -H 'X-CloudHeron: 1' \
   -H 'Content-Type: application/json' \
   -d '{"email":"YOUR_EMAIL","password":"YOUR_PASSWORD"}' \
-  http://127.0.0.1:8802/api/login
-curl -b /tmp/cloudheron-cookie http://127.0.0.1:8802/api/projects
+  http://127.0.0.1:8800/api/login
+curl -b /tmp/cloudheron-cookie http://127.0.0.1:8800/api/projects
 curl -b /tmp/cloudheron-cookie -H 'X-CloudHeron: 1' -X POST \
-  http://127.0.0.1:8802/api/assets/ASSET_ID/download-url
+  http://127.0.0.1:8800/api/assets/ASSET_ID/download-url
 ```
 
 ## 错误与状态
@@ -90,7 +90,7 @@ curl -b /tmp/cloudheron-cookie -H 'X-CloudHeron: 1' -X POST \
 
 正常停机后 queued 保留、running 等待；进程异常后 running 标失败，不自动再次调用模型。首版单 API 进程，分页/分布式 Worker/WebSocket 尚未加入。独立前端部署优先同源反向代理；跨源配置明确 CORS_ORIGINS 并保证 Cookie 同站及 HTTPS。
 
-## 接口目录（由 v0.2.1 OpenAPI 生成）
+## 接口目录（由 v0.2.2 OpenAPI 生成）
 
 | 模块 | 方法与路径 | 鉴权 | JSON 请求类型 | 成功状态 / 响应类型 |
 | --- | --- | --- | --- | --- |
@@ -179,3 +179,5 @@ Claude保存示例：
 ```json
 {"name":"Omni视频模型","spec":{"protocol":"vLLM-Omni","video_style":"vllm_omni","video_format":"multipart","base_url":"http://VIDEO_HOST:8091/v1","model":"MODEL_NAME","capabilities":["video","video_reference"],"paths":{}}}
 ```
+
+统一主入口为8800，页面、/api、/docs和/openapi.json同源。历史8802账号及PostgreSQL数据保留，客户端只需更新基址；旧Node8801独立保留，不做数据库合并。

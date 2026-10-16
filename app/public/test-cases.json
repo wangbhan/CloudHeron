@@ -22,7 +22,7 @@
       "测试项目已预置。打开顶栏“手动测试”，点击“重新载入测试项目”。",
       "打开测试项目，检查现有测试内容及用例数量。"
     ],
-    "expected": "包含45条用例、四份示例工作流、三份Agent对话和两份参考资产；重复点击不重复创建；没有运行或生成任务。",
+    "expected": "包含46条用例、四份示例工作流、三份Agent对话和两份参考资产；重复点击不重复创建；没有运行或生成任务。",
     "needs_model": false
   },
   {
@@ -497,7 +497,7 @@
     "precondition": "本机 Node.js 24；本机服务可用或使用 npm run test:backend 隔离启动。",
     "steps": [
       "在 app 执行 npm run test:backend，查看“启动脚本、健康探测和 SIGTERM 实际子进程验证”通过。",
-      "访问 http://127.0.0.1:8800/api/ready，核对 status=ready、version=0.1.6；或在 app 执行 npm run health。",
+      "访问 http://127.0.0.1:8801/api/ready，核对 status=ready、version=0.1.6；或在 app 执行 npm run health。",
       "核对 /api/system/status 未登录为 401，查看者为 403；专项测试已提供两类账号。",
       "记录实际结果，保留生产发布待执行状态。"
     ],
@@ -508,13 +508,13 @@
     "title": "FastAPI 就绪与接口文档",
     "req": "REQ-040;REQ-042",
     "dev": "DEV-023;DEV-025",
-    "precondition": "已按 backend/README.md 启动新版服务 8802；旧服务 8800 为历史版本。",
+    "precondition": "已按根README启动统一服务8800；旧Node版本默认8801。",
     "steps": [
-      "打开 http://127.0.0.1:8802/api/ready，检查 version、database 和 storage。",
-      "打开 http://127.0.0.1:8802/docs；查看登录、工作流运行、资产媒体接口的字段。",
+      "打开 http://127.0.0.1:8800/api/ready，检查 version、database 和 storage。",
+      "打开 http://127.0.0.1:8800/docs；查看登录、工作流运行、资产媒体接口的字段。",
       "访问 /openapi.json，与 backend/openapi.json 的版本及路径比较。"
     ],
-    "expected": "就绪结果为 0.2.1、postgresql、s3；Swagger 有明确路径、请求体、响应和 Cookie/Bearer 鉴权定义。",
+    "expected": "就绪结果为 0.2.2、postgresql、s3；Swagger 有明确路径、请求体、响应和 Cookie/Bearer 鉴权定义。",
     "needs_model": false
   },
   {
@@ -522,7 +522,7 @@
     "title": "PostgreSQL 保存与权限联调",
     "req": "REQ-040;REQ-042;REQ-004",
     "dev": "DEV-023;DEV-025",
-    "precondition": "新版 8802 登录；管理员与查看者账号。",
+    "precondition": "新版 8800 登录；管理员与查看者账号。",
     "steps": [
       "在新版新建项目、工作流和对话；保存节点参数，刷新确认保留，保存后手动运行按钮仍显示。",
       "管理员邀请查看者，授权项目读取；查看者查看内容并尝试编辑。",
@@ -594,7 +594,7 @@
     "title": "模型连接测试即时反馈与超时",
     "req": "REQ-043;REQ-015",
     "dev": "DEV-026;DEV-027",
-    "precondition": "新版8802；管理员；配置有效服务及故意错误地址，不使用生成接口做连通测试。",
+    "precondition": "新版8800；管理员；配置有效服务及故意错误地址，不使用生成接口做连通测试。",
     "steps": [
       "打开模型配置，点击连接测试，立即检查按钮“测试中”和行内说明；重复点击应被禁止。",
       "等待结果，检查成功/模型名未发现警告及耗时，结果保持在行内；切换页面返回同一模型检查仍可读。",
@@ -609,7 +609,7 @@
     "title": "OpenAI与Claude文本格式配置",
     "req": "REQ-044;REQ-015",
     "dev": "DEV-026;DEV-027",
-    "precondition": "新版8802；管理员；对应实际文本服务，或隔离HTTP夹具。",
+    "precondition": "新版8800；管理员；对应实际文本服务，或隔离HTTP夹具。",
     "steps": [
       "添加文本模型，文本请求格式选择OpenAI或Claude；填写含/v1的根地址、模型名称和密钥，保存并刷新重新配置。",
       "Claude默认文本路径/messages；OpenAI默认/chat/completions。高级自定义text路径应按实际服务设置，切换格式后检查旧自定义路径。",
@@ -624,7 +624,7 @@
     "title": "官方vLLM-Omni视频配置与参数",
     "req": "REQ-044;REQ-038;REQ-037",
     "dev": "DEV-026;DEV-027",
-    "precondition": "新版8802；支持官方异步/videos的实际vLLM-Omni模型或隔离夹具；参考图片/视频。",
+    "precondition": "新版8800；支持官方异步/videos的实际vLLM-Omni模型或隔离夹具；参考图片/视频。",
     "steps": [
       "添加或编辑视频模型，视频接口风格选择vLLM-Omni官方异步视频，检查multipart固定及无关文本字段隐藏；保存刷新。",
       "视频Agent或工作流视频节点展开API参数，填写num_frames=81、fps=16及模型支持的guidance_scale_2/boundary_ratio/flow_shift；填写采样参数。",
@@ -633,5 +633,21 @@
     ],
     "expected": "官方异步提交/轮询/下载链路和入桶正确；每次最多一个参考文件，图片视频统一input_reference；num_frames与采样字段保留；原自定义JSON风格仍可单独选择使用。",
     "needs_model": true
+  },
+  {
+    "id": "TST-046",
+    "title": "统一8800后台启动、状态与恢复",
+    "req": "REQ-045;REQ-039",
+    "dev": "DEV-028",
+    "needs_model": false,
+    "precondition": "已准备当前Python依赖和数据库；开发模拟器只用于测试，不用日常媒体验证其重启持久性。",
+    "steps": [
+      "进入项目根目录执行./start.sh，再执行./start.sh status，检查ready和8800。",
+      "打开http://127.0.0.1:8800及/api/ready、/docs，版本应为0.2.2；使用原8802创建的邮箱密码登录并核对配置。",
+      "重复执行./start.sh，核对同一后台PID；在新终端执行status，服务仍可用。",
+      "在backend执行python -m pytest -q tests/test_service_manager.py，在隔离数据库/端口验证退出恢复、正常停止重启保留账号、其它端口占用不被停止。",
+      "不在日常生成中强制结束进程；需要停止时./start.sh stop，等待当前任务完成，再启动。"
+    ],
+    "expected": "页面与API同源8800，账号和模型不重建；重复启动只有一个实例，退出的子API被恢复；隔离停止重启保留账号，不终止无关监听。电脑重启后需再运行start，开发Moto对象不持久。"
   }
 ]
