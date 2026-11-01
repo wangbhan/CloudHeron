@@ -1,0 +1,101 @@
+{
+  "date": "2026-11-01",
+  "scope": "v0.3原创设计原型，非业务重构",
+  "checks": [
+    {
+      "id": "project_sources",
+      "status": "passed",
+      "evidence": "项目对话卡进入#chat/demo，工作流卡进入#canvas/demo"
+    },
+    {
+      "id": "agent_fields",
+      "status": "passed",
+      "evidence": "视频显示时长/vLLM-Omni，提示词显示OpenAI/Claude及token"
+    },
+    {
+      "id": "proposal_cancel",
+      "status": "passed",
+      "evidence": "r1晨光保留，运行结果为空"
+    },
+    {
+      "id": "proposal_confirm",
+      "status": "passed",
+      "evidence": "r2雨夜，运行结果仍为空"
+    },
+    {
+      "id": "manual_run_error",
+      "status": "passed",
+      "evidence": "点击运行后显示节点02缺少模型的明确演示错误"
+    },
+    {
+      "id": "node_drag_and_edges",
+      "status": "passed",
+      "evidence": "节点由(60,150)移动至(120,110)，贝塞尔连线同步"
+    },
+    {
+      "id": "json_download",
+      "status": "passed",
+      "evidence": "实际浏览器下载cloudheron-demo.json，含新位置与确认后提示词"
+    },
+    {
+      "id": "themes",
+      "status": "passed",
+      "evidence": "深浅截图已检查；浅色背景rgb(242,244,246)，文字rgb(29,48,64)，品牌图无滤镜"
+    },
+    {
+      "id": "brand_assets",
+      "status": "passed",
+      "evidence": "3张原图SHA256保持；浏览器均加载成功"
+    },
+    {
+      "id": "chat_demo",
+      "status": "passed",
+      "evidence": "发送后显示演示反馈，未生成媒体"
+    },
+    {
+      "id": "model_format_demo",
+      "status": "passed",
+      "evidence": "视频显示vLLM-Omni；连接演示有持续反馈"
+    },
+    {
+      "id": "architecture_pages",
+      "status": "passed",
+      "evidence": "资产、能力库、创作设定及架构页面可访问"
+    },
+    {
+      "id": "javascript_parse",
+      "status": "passed",
+      "evidence": "node --check通过"
+    },
+    {
+      "id": "workbook",
+      "status": "passed",
+      "evidence": "47需求、37设计、31开发、48测试、5发布；440关系；人工8通过2失败及旧行保持；公式扫描0错误"
+    },
+    {
+      "id": "future_business",
+      "status": "not_run",
+      "evidence": "DEV-030/031尚未开发，TST-048与REL-005未执行；现有8800未替换"
+    },
+    {
+      "id": "export_existing_schema",
+      "status": "passed",
+      "evidence": "导出JSON经当前cloudheron.domain.workflow验证通过，顺序prompt/image/output；空模型仍不能运行"
+    },
+    {
+      "id": "expert_fields",
+      "status": "passed",
+      "evidence": "视频Agent对应动态影像专家，提示词Agent对应提示词整理专家"
+    },
+    {
+      "id": "prototype_network",
+      "status": "passed",
+      "evidence": "浏览器资源记录仅本地HTML/JS/CSS/PNG；原型源代码没有网络执行API"
+    }
+  ],
+  "manual_cases": {
+    "TST-047": "待人工评审",
+    "TST-048": "待开发后执行"
+  },
+  "source_limit": "公开主分支源码与README，未固定commit SHA；没有复制或执行参考项目代码"
+}

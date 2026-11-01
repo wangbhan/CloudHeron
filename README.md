@@ -29,3 +29,7 @@ cd /Users/bohan/work/AI漫剧
 `app/public`继续作为新版前端。旧Node/SQLite实现保留历史数据，不做隐式数据合并；如需查看，执行`cd app && npm start`，默认入口改为8801。旧版本不作为Claude/Omni新增格式的验收入口。
 
 共享前端回归：在app目录执行`npm run check`与`npm test`；新版后端回归见backend/README.md。后端启动配置、数据、密钥和.work被Git忽略；本项目只做本地提交，GitHub由用户自行推送。生产部署尚未执行。
+
+## v0.3 架构设计与评审原型
+
+新版设计入口：[总体架构](docs/design/DOC-DES-014-云鹭新版总体架构.md)、[参考调研](docs/design/DOC-REF-001-火宝项目架构调研.md)、[原型说明](design/v0.3-next/README.md)。本轮交付设计与静态原型；业务仍为v0.2.2，8800入口和原数据保持。DEV-030/031为后续业务开发。
