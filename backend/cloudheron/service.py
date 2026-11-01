@@ -59,7 +59,7 @@ class Service:
             self.version(saved,action,source)
         return saved
     def model_view(self,m):
-        spec=m['spec'] if self.user['role']=='admin' else {k:m['spec'].get(k) for k in ('source','protocol','capabilities','model','text_format','video_style')}
+        spec=m['spec'] if self.user['role']=='admin' else {k:m['spec'].get(k) for k in ('source','provider','interface_style','protocol','capabilities','model','text_format','image_style','video_style')}
         return {'id':m['id'],'name':m['name'],'enabled':m['enabled'],'has_key':bool(m['secret']),'spec':spec}
     def template(self,tid): return next((t for t in TEMPLATES if t['id']==tid),None) or self.resource('workflow_templates',tid)
     def skills(self,prompt,ids):

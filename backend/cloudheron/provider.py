@@ -16,7 +16,7 @@ class Provider:
         timeout=timeout or self.settings.model_timeout
         deadline=time.monotonic()+timeout
         url=spec['base_url'].rstrip('/')+path
-        with httpx.Client(timeout=timeout,follow_redirects=False) as client:
+        with httpx.Client(timeout=timeout,follow_redirects=False,trust_env=urlsplit(url).hostname not in ('localhost','127.0.0.1','::1')) as client:
             try:
                 kwargs={'headers':headers}
                 if files is not None: kwargs.update(data=body,files=files)
@@ -37,7 +37,10 @@ class Provider:
     def check(self,m):
         start=time.monotonic();spec=m['spec'];is_claude=spec.get('text_format', 'claude' if spec.get('protocol')=='Claude' else 'openai')=='claude'
         try:
-            result=self.request(m,spec.get('paths',{}).get('models','/models'),timeout=self.settings.model_check_timeout,claude=is_claude)
+            result=self.request(m,spec.get('paths',{}).get('models','/v1/models' if spec.get('interface_style')=='minimax_v2' else '/models'),timeout=self.settings.model_check_timeout,claude=is_claude)
+            if spec.get('interface_style') in ('minimax','minimax_v2'):
+                from .models.minimax import checked
+                checked(self,m,result)
             if not isinstance(result,dict) or not isinstance(result.get('data'),list): raise ValueError('模型列表响应缺少 data 数组，请检查 models 路径')
             models=[x['id'] for x in result['data'] if isinstance(x,dict) and isinstance(x.get('id'),str)][:200]
             available=spec['model'] in models
@@ -81,7 +84,7 @@ class Provider:
             addresses={x[4][0] for x in socket.getaddrinfo(u.hostname,u.port or 443)}
             if not addresses or any(not ipaddress.ip_address(a).is_global for a in addresses): raise ValueError('外部媒体须为公开地址')
         key=self.vault.decrypt(m['secret']);headers={'Authorization':'Bearer '+key} if own and key else {}
-        with httpx.Client(timeout=self.settings.model_timeout,follow_redirects=False) as client:
+        with httpx.Client(timeout=self.settings.model_timeout,follow_redirects=False,trust_env=u.hostname not in ('localhost','127.0.0.1','::1')) as client:
             with client.stream('GET',value,headers=headers) as r:
                 if r.status_code!=200: raise ValueError('媒体下载失败：HTTP '+str(r.status_code))
                 data=bytearray()
@@ -97,6 +100,9 @@ class Provider:
         if kind=='image' and any(a['mime'].startswith('video/') for a in refs): raise ValueError('图片仅支持参考图片')
         if kind=='image' and refs and 'image_edit' not in caps: raise ValueError('模型未启用参考图片编辑能力')
         if kind=='video' and any(a['mime'].startswith('video/') for a in refs) and 'video_reference' not in caps: raise ValueError('模型未启用参考视频能力')
+        if (kind=='image' and spec.get('image_style')=='minimax') or (kind=='video' and spec.get('video_style') in ('minimax','minimax_v2')):
+            from .models.minimax import generate
+            return generate(self,m,kind,prompt,refs,params)
         omni=kind=='video' and spec.get('video_style','vllm_omni' if spec.get('protocol')=='vLLM-Omni' else 'openai')=='vllm_omni'
         if omni and len(refs)>1: raise ValueError('官方 vLLM-Omni 视频任务每次只支持一个参考文件')
         body={**request_options(kind,params,spec),'model':spec['model'],'prompt':prompt}

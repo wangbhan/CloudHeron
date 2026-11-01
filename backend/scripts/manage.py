@@ -106,13 +106,30 @@ def supervise():
         fcntl.flock(lock,fcntl.LOCK_UN);lock.close()
     return exit_code
 
+def reload_api():
+    state=read_state();pid=state.get('api_pid')
+    if not owned(state) or type(pid)!=int or pid<=1:
+        return {**status(),'error':'本项目API未运行，请先start'},1
+    parent=subprocess.run(['ps','-p',str(pid),'-o','ppid='],capture_output=True,text=True).stdout.strip()
+    command=subprocess.run(['ps','-p',str(pid),'-o','args='],capture_output=True,text=True).stdout
+    if parent!=str(state['pid']) or 'uvicorn cloudheron.main:create_app' not in command:
+        return {**status(),'error':'API子进程身份不匹配，未停止任何进程'},1
+    os.kill(pid,signal.SIGTERM)  # Graceful shutdown waits for active generation.
+    until=time.monotonic()+25;result=status()
+    while time.monotonic()<until:
+        result=status()
+        if result.get('status')=='ready' and result.get('api_pid')!=pid:return result,0
+        time.sleep(.2)
+    return {**result,'error':'API仍在退出或恢复，请用status查看；没有强制结束任务或存储'},1
+
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('action',choices=['start','status','stop','_run']);parser.add_argument('--json',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('action',choices=['start','status','stop','reload','_run']);parser.add_argument('--json',action='store_true');args=parser.parse_args()
     if args.action=='_run':return supervise()
     RUN.mkdir(parents=True,exist_ok=True)
     with open(RUN/'control.lock','a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
         if args.action=='status':result=status();code=0 if result['status']=='ready' else 1
+        elif args.action=='reload':result,code=reload_api()
         elif args.action=='stop':
             state=read_state()
             if owned(state):os.kill(state['pid'],signal.SIGTERM)

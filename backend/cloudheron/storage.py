@@ -1,4 +1,5 @@
 import re
+from urllib.parse import urlsplit
 import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
@@ -20,7 +21,8 @@ class Storage:
     def __init__(self,settings):
         if settings.s3_endpoint_url and not settings.s3_endpoint_url.startswith('https://') and not settings.s3_allow_http: raise ValueError('云桶 endpoint 须为 HTTPS，开发 HTTP 需要显式允许')
         self.bucket=settings.s3_bucket
-        self.client=boto3.client('s3',endpoint_url=settings.s3_endpoint_url,region_name=settings.s3_region,aws_access_key_id=settings.s3_access_key,aws_secret_access_key=settings.s3_secret_key,config=Config(request_checksum_calculation='when_required',response_checksum_validation='when_required',signature_version='s3v4',s3={'addressing_style':settings.s3_addressing_style},connect_timeout=5,read_timeout=60,retries={'max_attempts':2}))
+        local=urlsplit(settings.s3_endpoint_url or '').hostname in ('localhost','127.0.0.1','::1')
+        self.client=boto3.client('s3',endpoint_url=settings.s3_endpoint_url,region_name=settings.s3_region,aws_access_key_id=settings.s3_access_key,aws_secret_access_key=settings.s3_secret_key,config=Config(**({'proxies':{}} if local else {}),request_checksum_calculation='when_required',response_checksum_validation='when_required',signature_version='s3v4',s3={'addressing_style':settings.s3_addressing_style},connect_timeout=5,read_timeout=60,retries={'max_attempts':2}))
         if settings.s3_create_bucket:
             try: self.client.head_bucket(Bucket=self.bucket)
             except ClientError as e:

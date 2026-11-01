@@ -1,4 +1,4 @@
-# 云鹭 FastAPI 后端 v0.2.2
+# 云鹭 FastAPI 后端 v0.3.0
 
 Python 3.12、FastAPI、psycopg 连接池、PostgreSQL 17 和 boto3 S3 对象存储。业务数据、工作流 JSONB、权限、任务队列在 PostgreSQL；图片视频字节在私有桶。此实现不运行 Node 后端，也不以本地媒体目录作为运行存储。
 
@@ -78,3 +78,7 @@ cd /Users/bohan/work/AI漫剧/backend
 DEV_STORAGE=external默认使用配置的外部依赖；DEV_STORAGE=moto仅允许当前本机http://127.0.0.1:59000开发配置，并在需要时启动Moto、恢复专用PG。Moto退出恢复会丢失原内存对象，这是开发限制；正式部署使用云桶或已验收的持久MinIO，不使用Moto。仅停止脚本自行启动的Moto，不停止已有外部服务或PostgreSQL。停止生成需等API当前任务完成，管理命令超过10秒会显示stopping，稍后用status查看。
 
 底层`scripts/start.sh`仍为前台启动、默认8800，可通过PORT指定其它端口；测试使用独立端口/数据库/状态目录。不要把两个API连接到同一业务数据库同时运行。
+
+## v0.3.0 模型领域模块
+
+`GET /api/model-styles`提供接口风格目录。厂商provider、接口interface_style、模型model独立；模型名无固定列表。支持MiniMax原生图片、视频V1/V2，旧配置兼容。`./start.sh reload`（项目根目录）仅重载API并保持PG和当前Moto进程。

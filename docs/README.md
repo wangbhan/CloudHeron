@@ -58,4 +58,8 @@
 
 ## v0.3设计提案（2026-11-01）
 
-[参考项目调研](design/DOC-REF-001-火宝项目架构调研.md) · [总体架构](design/DOC-DES-014-云鹭新版总体架构.md) · [页面设计](design/DOC-UI-001-云鹭工作室页面设计.md) · [实施计划](development/DOC-DEV-012-新版架构实施计划.md) · [设计验收](testing/DOC-TST-010-新版设计评审与验收计划.md) · [发布计划](release/DOC-REL-006-新版架构分阶段发布计划.md)。业务运行版本仍为v0.2.2。
+[参考项目调研](design/DOC-REF-001-火宝项目架构调研.md) · [总体架构](design/DOC-DES-014-云鹭新版总体架构.md) · [页面设计](design/DOC-UI-001-云鹭工作室页面设计.md) · [实施计划](development/DOC-DEV-012-新版架构实施计划.md) · [设计验收](testing/DOC-TST-010-新版设计评审与验收计划.md) · [发布计划](release/DOC-REL-006-新版架构分阶段发布计划.md)。此节为原设计交付；当前业务0.3.0的模型模块见下文。
+
+## v0.3.0 模型模块（2026-11-01）
+
+[接口风格设计](design/DOC-DES-015-模型接口风格解耦.md) · [开发记录](development/DOC-DEV-013-模型模块实施.md) · [测试验证](testing/DOC-TST-011-模型接口风格验证.md) · [发布与回退](release/DOC-REL-007-模型模块发布与回退.md)。本机业务0.3.0，整体Vue/Worker迁移另按DEV-030/031推进。

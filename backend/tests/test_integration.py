@@ -266,6 +266,25 @@ def test_vllm_omni_video_frames_reference_and_extensions(env):
         cid=chat(env,'Omni '+reference);r=c.post('/api/chats/'+cid+'/messages',json={'prompt':'视频测试','config':cfg});assert r.status_code==202;assert call_job(env,r.json()['id'])['status']=='completed'
         got=next(x for x in reversed(env['state']['received']) if x['path']=='/v1/videos');assert got['files']['input_reference']==(PNG if reference=='image' else VIDEO);assert len(got['files'])==1;assert got['body']['num_frames']=='81';assert 'seconds' not in got['body'];assert got['body']['fps']=='16';assert got['body']['guidance_scale_2']=='4';extras=json.loads(got['body']['extra_params']);assert extras['sample_solver']=='euler';assert extras['custom_flag'] is False;assert 'custom_flag' not in got['body']
 
+def test_model_style_catalog_names_permissions_and_preserved_key(env):
+    c=env['client'];styles=c.get('/api/model-styles');assert styles.status_code==200
+    assert {'openai','anthropic','minimax','minimax_v2','vllm_omni'}<={s['id'] for s in styles.json()}
+    spec={'interface_style':'minimax','provider':'My Provider','base_url':env['spec']['base_url'],'model':'custom/new-ID','capabilities':['text']}
+    r=c.post('/api/models',json={'name':'解耦配置','spec':spec,'api_key':'fixture-secret'});assert r.status_code==201,r.text
+    model=r.json();assert model['spec']['model']=='custom/new-ID';assert model['spec']['provider']=='My Provider';assert model['spec']['protocol']=='MiniMax'
+    updated=c.put('/api/models/'+model['id'],json={'name':'另一个模型','spec':{**spec,'model':'another/arbitrary-model'},'enabled':False});assert updated.status_code==200;assert updated.json()['has_key']
+    assert updated.json()['spec']['model']=='another/arbitrary-model'
+    # A disabled connection may be checked without enabling it or generating content.
+    checked=c.post('/api/models/'+model['id']+'/check',json={});assert checked.status_code==200 and checked.json()['status']=='warning'
+    view=next(m for m in env['viewer'].get('/api/models').json() if m['id']==model['id']);assert view['spec']['provider']=='My Provider';assert 'base_url' not in view['spec'];assert 'extra' not in view['spec'];assert 'fixture-secret' not in json.dumps(view)
+    assert env['viewer'].get('/api/model-styles').status_code==200
+    assert env['viewer'].post('/api/models',json={'name':'bad','spec':spec}).status_code==403
+    for bad in ({'interface_style':'unknown'},{'interface_style':'anthropic','capabilities':['image']}, {'interface_style':'minimax','capabilities':['video_reference','video']}):
+        assert c.post('/api/models',json={'name':'bad','spec':spec|bad}).status_code==400
+    for style,cap in [('minimax','image'),('minimax','video'),('minimax_v2','video')]:
+        added=c.post('/api/models',json={'name':style+' '+cap,'spec':spec|{'interface_style':style,'capabilities':[cap],'model':'unlisted-2028-model'}});assert added.status_code==201,added.text
+    assert c.get('/api/models').status_code==200
+
 def test_pg_single_executor_and_restart_queue(env):
     with pytest.raises(RuntimeError,match='已有云鹭执行器'):
         with TestClient(create_app(env['settings'])):pass

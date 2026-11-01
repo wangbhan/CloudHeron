@@ -181,3 +181,15 @@ Claude保存示例：
 ```
 
 统一主入口为8800，页面、/api、/docs和/openapi.json同源。历史8802账号及PostgreSQL数据保留，客户端只需更新基址；旧Node8801独立保留，不做数据库合并。
+
+## v0.3.0 模型接口风格
+
+新增`GET /api/model-styles`，需登录，返回`id/name/capabilities/base_hint/note`列表。`POST /api/models`与`PUT /api/models/{model_id}`沿用原合同，spec可增加`provider`及`interface_style`，model保持自由字符串；旧请求不传新字段时保持兼容。保存返回规范化的protocol/text_format/image_style/video_style，请以返回值为准。
+
+示例：`{"name":"图片服务","spec":{"provider":"自定义厂商","interface_style":"minimax","base_url":"https://api.minimax.io/v1","model":"填写上游实际ID","capabilities":["image"]},"api_key":"TOKEN","enabled":true}`。文本/图片/视频仍由同一model_id供工作流与对话使用。
+
+风格ID：openai、anthropic、vllm_omni、minimax、minimax_v2、legacy。风格能力不匹配返回400，未知风格返回400；模型名不在列表中不阻止保存。PUT不传api_key保留原凭据。模型列表对普通成员不返回地址、附加参数与密钥。
+
+`POST /api/models/{model_id}/check`仅管理员，允许检测停用连接，保持原ok/status/note/elapsed_ms/models/model_available返回格式，只GET模型列表，不提交生成任务。V2风格默认探测/v1/models。列表通常不能完整验证图片或视频生成能力。
+
+OpenAPI见backend/openapi.json及8800/docs，当前52路径/64操作。原51路径/63操作保留，新增1条只读目录接口。
