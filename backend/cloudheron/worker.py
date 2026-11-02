@@ -69,13 +69,24 @@ class Worker:
                     d.run('UPDATE jobs SET steps=%s,updated_at=now() WHERE id=%s',Jsonb(steps),jid)
                 def principal():
                     s.user=d.one('SELECT * FROM users WHERE id=%s',j['owner_id']);s.project(j['project_id'],True)
-                def save(data,kind): principal();return s.save_asset(data,kind,j)
+                def save(data,kind):
+                    principal();record=None
+                    if j['source']=='creation':
+                        nid=next((key for key,value in steps.items() if value['status']=='running'),None)
+                        name=next((n.get('label',n['id']) for n in snap['document']['nodes'] if n['id']==nid),'生成产物')
+                        record={'project_id':j['project_id'],'owner_id':j['owner_id'],'name':name,'kind':kind,'visibility':'private','metadata':{'job_id':jid,'source':j['source'],'source_id':j['source_id'],'node_id':nid}}
+                    return s.save_asset(data,kind,j,record)
                 api=Provider(self.ctx.settings,self.ctx.vault,self.ctx.storage,save)
                 def generate(kind,mid,prompt,refs,p): principal();return api.generate(s.model(mid),kind,s.skills(prompt,p.get('skill_ids',[])),refs,p)
                 def chat(mid,prompt,p): principal();return api.chat(s.model(mid),[{'role':'system','content':'你是云鹭提示词 Agent，整理可用提示词。'},{'role':'user','content':s.skills(prompt,p.get('skill_ids',[]))}],p)
                 try:
-                    principal();outputs=[];assistant=None
-                    if j['source']=='chat':
+                    principal();outputs=[];assistant=None;creation_update=None
+                    if j['source']=='creation_plan':
+                        from .creations.domain import parse_plan
+                        doc=snap['document'];step('plan','running')
+                        result=api.chat(s.model(doc['text_model_id']),[{'role':'system','content':'将故事整理为指定数量的独立画面，人物和风格保持一致。只返回JSON对象，格式为{"cards":[{"title":"画面标题","prompt":"可直接用于生图或视频的完整描述"}]}，不输出其它内容。'},{'role':'user','content':str({'story':doc['story'],'style':doc['style'],'count':doc['count'],'kind':doc['kind']})}],{'max_tokens':4096})
+                        doc['cards']=parse_plan(result,doc['count']);creation_update=doc;step('plan','completed',{'card_count':len(doc['cards'])})
+                    elif j['source']=='chat':
                         cfg=snap['config'];step('agent','running');history=[{'role':m['role'],'content':m['text']} for m in snap['messages'] if m['role'] in ('user','assistant') and m.get('text')][-20:]
                         refs=[s.asset(a) for a in cfg['asset_ids']]
                         if cfg['agent']=='prompt': result=api.chat(s.model(cfg['model_id']),[{'role':'system','content':'你是云鹭提示词 Agent，只返回可用提示词。'},*history[:-1],{'role':'user','content':s.skills(snap['prompt'],cfg['skill_ids'])}],cfg)
@@ -100,6 +111,10 @@ class Worker:
                         if not collected: collected=[a for n in doc['nodes'] if n['type'] in ('image_generate','video_generate') for a in values[n['id']].get('media',[])]
                         outputs=list({a['id']:a for a in collected}.values())
                     with d.tx():
+                        if creation_update is not None:
+                            principal()
+                            changed=d.one('UPDATE creations SET document=%s,revision=revision+1,updated_at=now() WHERE id=%s AND revision=%s RETURNING id',Jsonb(creation_update),j['source_id'],snap['revision'])
+                            if not changed: fail(409,'创作版本已改变，规划结果未覆盖当前内容')
                         if assistant:
                             c=d.one('SELECT messages FROM chats WHERE id=%s FOR UPDATE',j['source_id']);d.run('UPDATE chats SET messages=%s,updated_at=now() WHERE id=%s',Jsonb(c['messages']+[assistant]),j['source_id'])
                         d.run("UPDATE jobs SET status='completed',outputs=%s,updated_at=now() WHERE id=%s",Jsonb([a['id'] for a in outputs]),jid)

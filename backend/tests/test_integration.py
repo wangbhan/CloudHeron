@@ -58,6 +58,13 @@ def env():
             else:body=json.loads(raw)
             state['received'].append({'path':self.path,'body':body,'files':files,'headers':dict(self.headers)})
             if state['hold']:state['hold'].wait(10)
+            if self.path in ('/v1/chat/completions','/v1/responses'):
+                messages=body.get('messages',body.get('input',[]))
+                if messages and 'cards' in messages[0]['content'] and '画面' in messages[0]['content']:
+                    result=state.get('plan_response',json.dumps({'cards':[{'title':'画面'+str(i),'prompt':'云海中的白鹭'+str(i)} for i in range(1,4)]}))
+                    if self.path=='/v1/responses':return self.output({'status':'completed','output':[{'type':'message','content':[{'type':'output_text','text':result}]}]})
+                    return self.output({'choices':[{'message':{'content':result}}]})
+            if self.path.startswith('/v1/images/') and 'FAIL_THIS_FRAME' in body.get('prompt',''):return self.output({'error':'fixture frame failure'},422)
             if self.path=='/v1/messages':return self.output({'content':[{'type':'thinking','thinking':'hidden'},{'type':'text','text':'Claude 夹具提示词'}]})
             if self.path=='/v1/chat/completions':return self.output({'choices':[{'message':{'content':json.dumps({'explanation':'雨夜改晨光','document':state['proposal']}) if 'explanation' in body['messages'][0]['content'] else '夹具晨光提示词'}}]})
             if body.get('fixture_fail'):return self.output({'error':'unsupported fixture_fail Bearer fixture-secret'},422)
@@ -284,6 +291,66 @@ def test_model_style_catalog_names_permissions_and_preserved_key(env):
     for style,cap in [('minimax','image'),('minimax','video'),('minimax_v2','video')]:
         added=c.post('/api/models',json={'name':style+' '+cap,'spec':spec|{'interface_style':style,'capabilities':[cap],'model':'unlisted-2028-model'}});assert added.status_code==201,added.text
     assert c.get('/api/models').status_code==200
+
+def creation(env,kind='image',count=3,manual=False):
+    doc={'project_id':env['project']['id'],'name':'新手作品','story':'白鹭穿行云海','style':'东方山水','kind':kind,'count':count,'text_model_id':env['model']['id'],'model_id':env['model']['id'],'size':'1280x720' if kind=='video' else '1024x1024','seconds':6}
+    if manual:doc['cards']=[{'title':'画面'+str(i),'prompt':'云海'+str(i)} for i in range(count)]
+    r=env['client'].post('/api/creations',json=doc);assert r.status_code==201,r.text;return r.json(),doc
+
+def test_guided_plan_confirm_manual_run_and_workflow_export(env):
+    c=env['client'];before=len(env['state']['received']);item,doc=creation(env)
+    assert len(env['state']['received'])==before
+    p=c.post('/api/creations/'+item['id']+'/plan',json={'revision':1},headers={'Idempotency-Key':'plan-once'});assert p.status_code==202,p.text
+    assert call_job(env,p.json()['id'])['status']=='completed'
+    item=c.get('/api/creations/'+item['id']).json();assert item['revision']==2 and len(item['document']['cards'])==3
+    assert len(env['state']['received'])==before+1  # Only text planning, no media calls.
+    content=next(x for x in c.get('/api/projects/'+doc['project_id']+'/contents').json() if x['id']==item['id']);assert content['status']=='draft' and content['outputs']==[]
+    assert c.post('/api/creations/'+item['id']+'/plan',json={'revision':1},headers={'Idempotency-Key':'plan-once'}).json()['id']==p.json()['id']
+    assert c.post('/api/creations/'+item['id']+'/run',json={'revision':1}).status_code==409
+    run=c.post('/api/creations/'+item['id']+'/run',json={'revision':2},headers={'Idempotency-Key':'guided-images'});assert run.status_code==202,run.text
+    j=call_job(env,run.json()['id']);assert j['status']=='completed',j;assert len(j['outputs'])==3
+    assert c.post('/api/creations/'+item['id']+'/run',json={'revision':2},headers={'Idempotency-Key':'guided-images'}).json()['id']==j['id']
+    assets=c.get('/api/assets').json();assert all(next(a for a in assets if a['id']==aid)['metadata']['source']=='creation' for aid in j['outputs'])
+    contents=c.get('/api/projects/'+doc['project_id']+'/contents').json();assert any(x['source']=='creation' and x['id']==item['id'] for x in contents)
+    before=len(env['state']['received']);w=c.post('/api/creations/'+item['id']+'/workflow',json={'revision':2});assert w.status_code==201,w.text;assert len(w.json()['document']['nodes'])==7;assert len(env['state']['received'])==before
+
+def test_guided_manual_video_and_failure_preserves_partial_assets(env):
+    c=env['client'];item,doc=creation(env,'video',2,True)
+    # Manual cards can generate without any text model.
+    saved=c.put('/api/creations/'+item['id'],json={**doc,'text_model_id':'','revision':1});assert saved.status_code==200,saved.text
+    r=c.post('/api/creations/'+item['id']+'/run',json={'revision':2});assert r.status_code==202;assert len(call_job(env,r.json()['id'])['outputs'])==2
+    item,doc=creation(env,'image',2,True);doc['cards'][1]['prompt']='FAIL_THIS_FRAME'
+    assert c.put('/api/creations/'+item['id'],json={**doc,'revision':1}).status_code==200
+    r=c.post('/api/creations/'+item['id']+'/run',json={'revision':2});j=call_job(env,r.json()['id']);assert j['status']=='failed';assert j['steps']['generate_2']['status']=='failed';assert len(j['steps']['generate_1']['output']['asset_ids'])==1
+    assert c.get('/api/assets/'+j['steps']['generate_1']['output']['asset_ids'][0]+'/media').content==PNG
+
+def test_guided_permissions_validation_and_planning_failure(env):
+    c=env['client'];item,doc=creation(env)
+    assert env['viewer'].post('/api/creations',json=doc).status_code==403
+    assert env['viewer'].post('/api/creations/'+item['id']+'/plan',json={'revision':1}).status_code==403
+    assert env['viewer'].get('/api/creations/'+item['id']).status_code==200
+    private=c.post('/api/projects',json={'name':'私有集成创作','visibility':'private'}).json()
+    own=c.post('/api/creations',json=doc|{'project_id':private['id']}).json()
+    assert env['editor'].get('/api/creations/'+own['id']).status_code==403
+    assert all(x['id']!=own['id'] for x in env['editor'].get('/api/creations').json())
+    assert c.post('/api/creations/'+item['id']+'/run',json={'revision':1}).status_code==400
+    assert c.put('/api/creations/'+item['id'],json={**doc,'revision':1,'cards':[{'title':'x','prompt':''}]}).status_code==400
+    env['state']['plan_response']='bad-json'
+    try:
+        r=c.post('/api/creations/'+item['id']+'/plan',json={'revision':1});j=call_job(env,r.json()['id']);assert j['status']=='failed';assert 'JSON' in j['error']
+        assert c.get('/api/creations/'+item['id']).json()['revision']==1
+    finally:env['state'].pop('plan_response',None)
+
+def test_guided_busy_revision_and_atomic_plan_completion(env):
+    c=env['client'];item,doc=creation(env);gate=threading.Event();env['state']['hold']=gate
+    r=c.post('/api/creations/'+item['id']+'/plan',json={'revision':1});assert r.status_code==202
+    try:
+        wait(lambda:c.get('/api/jobs/'+r.json()['id']).json()['status']=='running')
+        assert c.put('/api/creations/'+item['id'],json={**doc,'revision':1}).status_code==409
+        assert c.post('/api/creations/'+item['id']+'/plan',json={'revision':1}).status_code==409
+    finally:env['state']['hold']=None;gate.set()
+    assert call_job(env,r.json()['id'])['status']=='completed'
+    assert c.put('/api/creations/'+item['id'],json={**doc,'revision':1}).status_code==409
 
 def test_pg_single_executor_and_restart_queue(env):
     with pytest.raises(RuntimeError,match='已有云鹭执行器'):

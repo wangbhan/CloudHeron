@@ -21,7 +21,7 @@ from .service import Service,asset_view,job_view,template_view
 from .worker import Worker
 from .provider import Provider
 
-VERSION='0.3.0';cookie_scheme=APIKeyCookie(name='cloudheron',auto_error=False);bearer_scheme=HTTPBearer(auto_error=False)
+VERSION='0.3.1';cookie_scheme=APIKeyCookie(name='cloudheron',auto_error=False);bearer_scheme=HTTPBearer(auto_error=False)
 def seed(d):
     skills=[('skill_visual','画面提示词','image','主体、环境、光线与构图：{{prompt}}'),('skill_motion','视频动作描述','video','明确主体动作与运镜，避免无关切换：{{prompt}}'),('skill_reference','参考资产注入','all','保持参考资产的外观、服装与风格。{{prompt}}'),('skill_structure','提示词结构整理','prompt','将创作要求组织为主体、环境、光线、构图或动作：{{prompt}}'),('skill_concise','提示词精炼','prompt','去除重复描述，只输出提示词：{{prompt}}')]
     for sid,name,task,t in skills: d.run('INSERT INTO skills(id,name,task,template,builtin) VALUES(%s,%s,%s,%s,true) ON CONFLICT(id) DO NOTHING',sid,name,task,t)
@@ -172,14 +172,16 @@ def create_app(settings:Settings|None=None):
     @api.get('/projects/{project_id}/contents',response_model=list[dict],tags=['项目'])
     def contents(project_id:str,s:Svc):
         s.project(project_id);out=[]
-        for table,source in [('chats','chat'),('workflows','workflow')]:
+        for table,source in [('chats','chat'),('workflows','workflow'),('creations','creation')]:
             for r in s.db.all('SELECT * FROM '+table+' WHERE project_id=%s ORDER BY updated_at DESC',project_id):
-                j=s.db.one('SELECT * FROM jobs WHERE source_id=%s ORDER BY created_at DESC LIMIT 1',r['id']);out.append({'id':r['id'],'project_id':project_id,'source':source,'title':r.get('name',r.get('title')),'status':j['status'] if j else 'draft','outputs':j['outputs'] if j else []})
+                j=s.db.one("SELECT * FROM jobs WHERE source_id=%s AND (%s!='creation' OR source='creation') ORDER BY created_at DESC LIMIT 1",r['id'],source);out.append({'id':r['id'],'project_id':project_id,'source':source,'title':r.get('name',r.get('title')),'status':j['status'] if j else 'draft','outputs':j['outputs'] if j else []})
         return out
     @api.get('/projects/{project_id}/test-cases',response_model=list[dict],tags=['测试'])
     def cases(project_id:str,s:Svc): s.project(project_id);return [r['definition'] for r in s.db.all('SELECT definition FROM project_test_cases WHERE project_id=%s ORDER BY test_id',project_id)]
     from .models.routes import register as register_models
     register_models(api,Svc,settings)
+    from .creations.routes import register as register_creations
+    register_creations(api,Svc)
     @api.get('/task-options',response_model=dict,tags=['能力'])
     def task_options(s:Svc): return OPTIONS
     @api.get('/agents',response_model=list[AgentOut],tags=['能力'])

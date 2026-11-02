@@ -23,7 +23,8 @@ def normalize_spec(spec):
     if not isinstance(caps,list) or any(c not in entry['capabilities'] for c in caps): fail(400,'所选接口风格不支持这些任务能力')
     if style=='legacy': return out
     out['protocol']={'openai':'OpenAI','anthropic':'Claude','vllm_omni':'vLLM-Omni','minimax':'MiniMax','minimax_v2':'MiniMax'}[style]
-    out['text_format']=out.get('text_format','openai') if style=='minimax' else 'claude' if style=='anthropic' else 'openai'
+    out['text_format']='claude' if style=='anthropic' else 'openai' if style=='minimax_v2' else out.get('text_format','openai')
+    if style in ('openai','vllm_omni') and out['text_format']=='claude': fail(400,'该接口风格请选择Chat Completions或Responses')
     out['image_style']='minimax' if style=='minimax' else 'openai'
     out['video_style']='minimax_v2' if style=='minimax_v2' else 'minimax' if style=='minimax' else 'vllm_omni' if style=='vllm_omni' else 'openai'
     if style in ('minimax','minimax_v2'): out.update(format='json',video_format='json')

@@ -3,6 +3,12 @@ from urllib.parse import urlsplit,quote
 import httpx
 from .domain import request_options
 from .security import fail
+def endpoint(spec,key,default):
+    if key in spec.get('paths',{}): return spec['paths'][key]
+    path=urlsplit(spec['base_url']).path.rstrip('/')
+    if not path and not default.startswith(('/v1/','/v2/')): return '/v1'+default
+    return default
+
 class Provider:
     def __init__(self,settings,vault,storage,save): self.settings=settings;self.vault=vault;self.storage=storage;self.save=save
     def redact(self,message,key):
@@ -29,30 +35,43 @@ class Provider:
                         if time.monotonic()>deadline: raise ValueError('模型请求超过限定时间')
                         if len(data)+len(chunk)>limit: raise ValueError('模型响应超过大小上限')
                         data.extend(chunk)
-                    if r.status_code>=300: raise ValueError(f'模型 HTTP {r.status_code}：{self.redact(data.decode(errors="replace"),key)}')
+                    if r.status_code>=300:
+                        hint={401:'请核对生成接口的密钥',403:'请核对模型和生成权限',404:'请核对接口路径与协议',429:'请检查额度或速率限制',502:'上游生成服务暂不可用，列表检测成功不代表生成可用',503:'上游服务暂不可用',504:'上游生成服务超时'}.get(r.status_code,'请核对模型与请求参数')
+                        raise ValueError(f'模型 HTTP {r.status_code}（{method} {path}）：{hint}；{self.redact(data.decode(errors="replace"),key)}')
                     if raw: return bytes(data),r.headers.get('content-type','application/octet-stream').split(';')[0]
                     try: return json.loads(data)
                     except ValueError: raise ValueError('模型未返回有效 JSON')
             except httpx.HTTPError: raise ValueError('模型服务连接失败或超时，请检查地址和服务状态') from None
     def check(self,m):
-        start=time.monotonic();spec=m['spec'];is_claude=spec.get('text_format', 'claude' if spec.get('protocol')=='Claude' else 'openai')=='claude'
+        start=time.monotonic();spec=m['spec'];is_claude='text' in spec['capabilities'] and spec.get('text_format', 'claude' if spec.get('protocol')=='Claude' else 'openai')=='claude'
         try:
-            result=self.request(m,spec.get('paths',{}).get('models','/v1/models' if spec.get('interface_style')=='minimax_v2' else '/models'),timeout=self.settings.model_check_timeout,claude=is_claude)
+            result=self.request(m,endpoint(spec,'models','/v1/models' if spec.get('interface_style')=='minimax_v2' else '/models'),timeout=self.settings.model_check_timeout,claude=is_claude)
             if spec.get('interface_style') in ('minimax','minimax_v2'):
                 from .models.minimax import checked
                 checked(self,m,result)
             if not isinstance(result,dict) or not isinstance(result.get('data'),list): raise ValueError('模型列表响应缺少 data 数组，请检查 models 路径')
             models=[x['id'] for x in result['data'] if isinstance(x,dict) and isinstance(x.get('id'),str)][:200]
             available=spec['model'] in models
-            return {'ok':True,'status':'success' if available else 'warning','models':models,'model_available':available,'elapsed_ms':round((time.monotonic()-start)*1000),'note':'服务连接成功，所填模型在返回列表中；生成能力以实际任务为准' if available else '服务连接成功，但返回列表未发现所填模型，请核对模型名称或列表分页；尚未验证生成能力'}
+            return {'ok':True,'status':'success' if available else 'warning','models':models,'model_available':available,'elapsed_ms':round((time.monotonic()-start)*1000),'scope':'model_list','generation_verified':False,'note':'模型列表可读，已发现所填模型；尚未验证生成接口及其权限，请使用“验证生成”' if available else '模型列表可读，但未发现所填模型；可保存配置，生成能力仍须实际验收'}
         except ValueError as e:
-            return {'ok':False,'status':'failed','models':[],'model_available':None,'elapsed_ms':round((time.monotonic()-start)*1000),'note':self.redact(str(e),self.vault.decrypt(m['secret']))}
+            return {'ok':False,'status':'failed','models':[],'model_available':None,'elapsed_ms':round((time.monotonic()-start)*1000),'scope':'model_list','generation_verified':False,'note':self.redact(str(e),self.vault.decrypt(m['secret']))}
     def chat(self,m,messages,params=None):
         spec=m['spec']
         if 'text' not in spec['capabilities']: raise ValueError('模型未启用文本能力')
         values=request_options('text',params or {},spec)
         is_claude=spec.get('text_format','claude' if spec.get('protocol')=='Claude' else 'openai')=='claude'
-        if is_claude:
+        if spec.get('text_format')=='responses':
+            unsupported=set(values)&{'stop','presence_penalty','frequency_penalty','repetition_penalty','top_k','seed'}
+            if unsupported: raise ValueError('Responses 格式不支持这些通用参数：'+','.join(sorted(unsupported)))
+            if 'max_tokens' in values: values['max_output_tokens']=values.pop('max_tokens')
+            body={**values,'model':spec['model'],'input':messages,'stream':False,'store':False}
+            data=self.request(m,endpoint(spec,'text','/responses'),'POST',body)
+            if not isinstance(data,dict): raise ValueError('Responses 响应须为JSON对象')
+            if data.get('error'): raise ValueError(self.redact('Responses 错误：'+str(data['error']),self.vault.decrypt(m['secret'])))
+            content='\n'.join(b['text'] for item in data.get('output',[]) if isinstance(item,dict) and item.get('type')=='message' for b in item.get('content',[]) if isinstance(b,dict) and b.get('type')=='output_text' and isinstance(b.get('text'),str))
+            if not content and isinstance(data.get('output_text'),str): content=data['output_text']
+            if not content and data.get('status')=='incomplete': raise ValueError('Responses 输出未完成，请检查输出token上限和上游状态')
+        elif is_claude:
             unsupported=set(values)&{'presence_penalty','frequency_penalty','repetition_penalty','seed'}
             if unsupported: raise ValueError('Claude 格式不支持这些 OpenAI 参数：'+','.join(sorted(unsupported)))
             if 'stop' in values: values['stop_sequences']=values.pop('stop')
@@ -60,13 +79,13 @@ class Provider:
             body={**values,'model':spec['model'],'messages':[x for x in messages if x['role']!='system'],'stream':False}
             system='\n'.join(x['content'] for x in messages if x['role']=='system')
             if system: body['system']=system
-            data=self.request(m,spec.get('paths',{}).get('text','/messages'),'POST',body,claude=True)
+            data=self.request(m,endpoint(spec,'text','/messages'),'POST',body,claude=True)
             blocks=data.get('content',[]) if isinstance(data,dict) else []
             if not isinstance(blocks,list): raise ValueError('Claude 响应缺少 content 文本块')
             content='\n'.join(x['text'] for x in blocks if isinstance(x,dict) and x.get('type')=='text' and isinstance(x.get('text'),str))
         else:
             body={**values,'model':spec['model'],'messages':messages,'stream':False}
-            data=self.request(m,spec.get('paths',{}).get('text','/chat/completions'),'POST',body)
+            data=self.request(m,endpoint(spec,'text','/chat/completions'),'POST',body)
             try: content=data['choices'][0]['message']['content']
             except (KeyError,IndexError,TypeError): raise ValueError('文本响应缺少 choices[0].message.content') from None
         if not isinstance(content,str) or not content.strip(): raise ValueError('文本响应为空')
@@ -109,7 +128,7 @@ class Provider:
         if params.get('size'): body['size']=params['size']
         if kind=='video': body['seconds']=str(params.get('seconds',4))
         if params.get('seed','')!='': body['seed']=params['seed']
-        path=paths.get('video','/videos') if kind=='video' else paths.get('edit','/images/edits') if refs else paths.get('image','/images/generations')
+        path=endpoint(spec,'video','/videos') if kind=='video' else endpoint(spec,'edit','/images/edits') if refs else endpoint(spec,'image','/images/generations')
         if omni:
             # Model-specific extensions travel inside the documented extra_params.
             known={'model','prompt','size','seconds','seed','fps','num_frames','width','height','num_inference_steps','guidance_scale','guidance_scale_2','true_cfg_scale','boundary_ratio','flow_shift','negative_prompt','generate_sound','sound_duration','enable_frame_interpolation','frame_interpolation_exp','frame_interpolation_scale','frame_interpolation_model_path','lora','user','extra_params'}
@@ -138,7 +157,7 @@ class Provider:
         deadline=time.monotonic()+1800;state=data;upstream_id=quote(data['id'],safe='')
         while state.get('status') not in ('completed','failed'):
             if time.monotonic()>deadline: raise ValueError('视频生成超过 30 分钟，请先检查上游任务 '+data['id'])
-            time.sleep(self.settings.poll_seconds);state=self.request(m,paths.get('video_status','/videos/{id}').replace('{id}',upstream_id))
+            time.sleep(self.settings.poll_seconds);state=self.request(m,endpoint(spec,'video_status','/videos/{id}').replace('{id}',upstream_id))
         if state['status']=='failed': raise ValueError(self.redact(state.get('error',{}).get('message','视频生成失败'),self.vault.decrypt(m['secret'])))
-        raw,_=self.request(m,paths.get('video_content','/videos/{id}/content').replace('{id}',upstream_id),raw=True)
+        raw,_=self.request(m,endpoint(spec,'video_content','/videos/{id}/content').replace('{id}',upstream_id),raw=True)
         return [self.save(raw,'video')]

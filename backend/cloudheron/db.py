@@ -4,7 +4,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg import sql
 
-TABLES={'meta','users','sessions','projects','workflows','chats','assets','models','skills','experts','proposals','publications','jobs','workflow_versions','workflow_templates','project_test_cases','request_keys'}
+TABLES={'creations','meta','users','sessions','projects','workflows','chats','assets','models','skills','experts','proposals','publications','jobs','workflow_versions','workflow_templates','project_test_cases','request_keys'}
 JSON_COLUMNS={'acl','document','messages','metadata','spec','skill_ids','snapshot','steps','outputs','definition','value'}
 def now():
     from datetime import datetime,timezone

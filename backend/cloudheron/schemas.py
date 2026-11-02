@@ -59,4 +59,5 @@ class BootstrapOut(BaseModel): setup_required:bool;team:str;node_types:dict[str,
 class AgentOut(BaseModel): id:str;name:str;description:str;model_capability:str;fields:list[str];defaults:dict[str,Any]
 
 class ModelCheckOut(BaseModel):
+    scope:Literal['model_list']='model_list';generation_verified:bool=False
     ok:bool;status:Literal['success','warning','failed'];note:str;elapsed_ms:int;models:list[str];model_available:bool|None=None

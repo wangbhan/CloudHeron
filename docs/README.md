@@ -63,3 +63,7 @@
 ## v0.3.0 模型模块（2026-11-01）
 
 [接口风格设计](design/DOC-DES-015-模型接口风格解耦.md) · [开发记录](development/DOC-DEV-013-模型模块实施.md) · [测试验证](testing/DOC-TST-011-模型接口风格验证.md) · [发布与回退](release/DOC-REL-007-模型模块发布与回退.md)。本机业务0.3.0，整体Vue/Worker迁移另按DEV-030/031推进。
+
+## v0.3.1 集成创作（2026-11-02）
+
+[设计](design/DOC-DES-016-生成验收与集成创作设计.md) · [开发](development/DOC-DEV-014-生成验证与集成创作实施.md) · [测试](testing/DOC-TST-012-生成与集成创作验证.md) · [上线](release/DOC-REL-008-集成创作增量发布.md)。本机平台0.3.1，外部代理故障单独跟踪。

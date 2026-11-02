@@ -193,3 +193,13 @@ Claude保存示例：
 `POST /api/models/{model_id}/check`仅管理员，允许检测停用连接，保持原ok/status/note/elapsed_ms/models/model_available返回格式，只GET模型列表，不提交生成任务。V2风格默认探测/v1/models。列表通常不能完整验证图片或视频生成能力。
 
 OpenAPI见backend/openapi.json及8800/docs，当前52路径/64操作。原51路径/63操作保留，新增1条只读目录接口。
+
+## v0.3.1 集成创作与生成合同
+
+GET/POST /api/creations：按项目权限列出和新建作品；GET/PUT /api/creations/{id}：读取或以revision保存。document字段包含story/style/kind/count/text_model_id/model_id/size/seconds/asset_ids/cards，创建和保存通过平铺字段提交，详情返回document。
+
+POST /api/creations/{id}/plan：{revision}，202返回creation_plan Job；POST .../run：{revision}，202返回creation Job。两者支持Idempotency-Key，忙碌或过期版本409。规划只生成画面，不生成媒体；run编译当前确认内容执行。GET详情包含最新job和can_edit，供轮询。
+
+POST /api/creations/{id}/workflow：{revision}，201返回普通工作流，仅保存不运行。所有写操作需要X-CloudHeron:1与项目编辑权限，查看者仅可读。
+
+模型列表检测增加scope=model_list、generation_verified=false；文本格式可选responses。默认端点主机根地址加/v1，自定义paths优先，版本基地址保持；Responses将max_tokens映射max_output_tokens，读取output_text内容块。实际生成验收复用现有chats/messages/jobs API，不使用列表检测结果替代生成状态。当前OpenAPI57路径71操作。

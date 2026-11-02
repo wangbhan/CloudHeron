@@ -50,7 +50,7 @@ def model_spec(spec):
     u=urlsplit(spec.get('base_url',''))
     if u.scheme not in ('http','https') or not u.hostname or u.username or u.password or u.query or u.fragment: fail(400,'模型地址须为 HTTP(S) 服务根地址')
     if spec.get('protocol') not in ('OpenAI','Claude','vLLM','vLLM-Omni','SGLang','MiniMax'): fail(400,'模型协议有误')
-    if spec.get('text_format','openai') not in ('openai','claude'): fail(400,'文本请求格式有误')
+    if spec.get('text_format','openai') not in ('openai','claude','responses'): fail(400,'文本请求格式有误')
     if spec.get('video_style','openai') not in ('openai','vllm_omni','minimax','minimax_v2'): fail(400,'视频接口风格有误')
     if spec.get('video_style', 'vllm_omni' if spec.get('protocol')=='vLLM-Omni' else 'openai')=='vllm_omni' and spec.get('video_format','multipart')!='multipart': fail(400,'官方 vLLM-Omni 视频接口使用 multipart，请选择对应格式')
     if spec.get('image_style','openai') not in ('openai','minimax'): fail(400,'图片接口风格有误')

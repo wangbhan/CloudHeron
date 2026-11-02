@@ -12,6 +12,7 @@ def checked(p,m,data):
     return data
 
 def generate(p,m,kind,prompt,refs,params):
+    from ..provider import endpoint
     spec=m['spec'];paths=spec.get('paths',{});values=request_options(kind,params,spec)
     data_uri=lambda a:'data:'+a['mime']+';base64,'+base64.b64encode(p.storage.read(a['file'])).decode()
     body={**values,'model':spec['model']}
@@ -26,7 +27,7 @@ def generate(p,m,kind,prompt,refs,params):
             body.setdefault('width',int(match[1]));body.setdefault('height',int(match[2]))
         if params.get('seed','')!='': body['seed']=params['seed']
         if refs: body['subject_reference']=[{'type':'character','image_file':data_uri(a)} for a in refs]
-        result=checked(p,m,p.request(m,paths.get('image','/image_generation'),'POST',body))
+        result=checked(p,m,p.request(m,endpoint(spec,'image','/image_generation'),'POST',body))
         result=result.get('data',{})
         if not isinstance(result,dict): raise ValueError('MiniMax 图片响应缺少 data 对象')
         items=[{'b64_json':x} for x in result.get('image_base64',[])]+[{'url':x} for x in result.get('image_urls',[])]
@@ -42,19 +43,19 @@ def generate(p,m,kind,prompt,refs,params):
     if v2:
         body['content']=[{'type':'text','text':prompt}]+[{'type':'video_url' if a['mime'].startswith('video/') else 'image_url',('video_url' if a['mime'].startswith('video/') else 'image_url'):{'url':data_uri(a)},'role':'reference_video' if a['mime'].startswith('video/') else 'reference_image'} for a in refs]
         # V2 defaults are rooted at the host; custom endpoints remain relative to base_url.
-        create_path=paths.get('video','/v2/video_generation')
+        create_path=endpoint(spec,'video','/v2/video_generation')
     else:
         if len(refs)>1 or any(not a['mime'].startswith('image/') for a in refs): raise ValueError('MiniMax 视频 V1 此入口仅支持一张首帧参考图；多参考或参考视频请选择 V2')
         body['prompt']=prompt
         if refs: body['first_frame_image']=data_uri(refs[0])
-        create_path=paths.get('video','/video_generation')
+        create_path=endpoint(spec,'video','/video_generation')
     result=checked(p,m,p.request(m,create_path,'POST',body));tid=result.get('task_id')
     if not isinstance(tid,str) or not tid: raise ValueError('MiniMax 视频响应缺少 task_id')
     deadline=time.monotonic()+1800
     while True:
         if time.monotonic()>deadline: raise ValueError('MiniMax 视频超过30分钟，请先查询上游任务 '+tid)
-        if v2: path=paths.get('video_status','/v2/query/video_generation/{id}').replace('{id}',quote(tid,safe=''))
-        else: path=paths.get('video_status','/query/video_generation')+'?task_id='+quote(tid,safe='')
+        if v2: path=endpoint(spec,'video_status','/v2/query/video_generation/{id}').replace('{id}',quote(tid,safe=''))
+        else: path=endpoint(spec,'video_status','/query/video_generation')+'?task_id='+quote(tid,safe='')
         result=checked(p,m,p.request(m,path))
         if v2: result=result.get('task',{})
         if not isinstance(result,dict): raise ValueError('MiniMax 视频任务响应格式有误')
@@ -70,7 +71,7 @@ def generate(p,m,kind,prompt,refs,params):
     else:
         fid=result.get('file_id')
         if not isinstance(fid,(str,int)) or not str(fid): raise ValueError('MiniMax 视频完成但缺少 file_id')
-        result=checked(p,m,p.request(m,paths.get('video_content','/files/retrieve')+'?file_id='+quote(str(fid),safe='')))
+        result=checked(p,m,p.request(m,endpoint(spec,'video_content','/files/retrieve')+'?file_id='+quote(str(fid),safe='')))
         url=result.get('file',{}).get('download_url')
     if not isinstance(url,str) or not url: raise ValueError('MiniMax 视频完成但缺少下载地址')
     return [p.download(m,{'url':url},'video')]
