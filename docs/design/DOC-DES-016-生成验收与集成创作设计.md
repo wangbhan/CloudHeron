@@ -21,3 +21,8 @@
 UI：项目、集成创作、对话、画板并列；集成详情按故事、确认画面、生成三段组织，动态模型选择、缺失能力提示、刷新恢复。没有时间线与自动合片。
 
 参考[火宝短剧README](https://github.com/chatfire-AI/huobao-drama)的一站式创作组织与任务归属，保留云鹭自身范围；未复制其代码和素材。公开主分支未固定SHA，仓库声明CC BY-NC-SA4.0。Responses合同依据[OpenAI Docs](https://developers.openai.com/api/reference/typescript/resources/responses/methods/create)。
+
+
+### 2026-11-03 批量入口与AI故障复核
+
+DES-039/040：导航及列表明确标记“集成创作 · 批量生成”；作品顶部常驻批量操作栏显示画面数与图片/视频类型。按钮按权限、任务状态、实际画面列表、选中媒体模型校验。助手502/503/504保留原错误，补充本次无新分析/提案及未改工作流的说明和模型配置链接。
