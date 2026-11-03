@@ -77,7 +77,7 @@ def workflow(w):
     for n in w['nodes']:
         if not isinstance(n,dict) or not isinstance(n.get('id'),str) or not re.fullmatch(r'[-\w]{1,80}',n['id'],re.ASCII) or n['id'] in nodes or n.get('type') not in NODES: fail(400,'节点编号或类型有误')
         p=n.get('params');pos=n.get('position',{})
-        if not isinstance(p,dict) or not isinstance(pos,dict) or any(type(pos.get(k)) not in (int,float) or not math.isfinite(pos[k]) or not 0<=pos[k]<=10000 for k in ('x','y')): fail(400,'节点参数或位置有误')
+        if not isinstance(p,dict) or not isinstance(pos,dict) or any(type(pos.get(k)) not in (int,float) or not math.isfinite(pos[k]) or not 0<=pos[k]<=10000 for k in ('x','y')): fail(400,'节点 '+n['id']+' 的params须为对象，position.x/y须为0–10000的有限数字')
         for k in ('prompt','model_id','asset_id','size'):
             if k in p and not isinstance(p[k],str): fail(400,'节点 '+k+' 须为文本')
         if 'seconds' in p and (type(p['seconds']) not in (int,float) or not 1<=p['seconds']<=120): fail(400,'视频时长须为 1–120 秒')

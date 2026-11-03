@@ -3,3 +3,7 @@
 .studio-page>.notice{background:var(--surface);color:var(--muted);border:1px solid var(--line);border-left:2px solid var(--secondary);line-height:1.8}
 
 .studio-batch-bar{position:sticky;top:12px;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 22px;margin:20px 0;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 5px 20px #00000012}.studio-batch-bar strong{font-size:16px}.studio-batch-bar p{margin:6px 0 0}.studio-batch-bar .btn{white-space:nowrap}@media(max-width:760px){.studio-batch-bar{align-items:stretch;flex-direction:column;gap:12px;top:6px;padding:15px}}
+
+.studio-number{display:flex;align-items:flex-start;gap:6px}.studio-number input{accent-color:var(--ink)}@media(max-width:760px){.studio-scene>.studio-number{display:flex}}
+
+.studio-page button,.studio-page textarea,.studio-page input,.studio-page select{scroll-margin-block:140px}

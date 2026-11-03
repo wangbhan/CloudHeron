@@ -28,9 +28,12 @@ def config(s,doc,need_media=False):
         if doc['kind'] not in media['spec']['capabilities']: fail(400,'请选择对应图片或视频模型')
     for aid in doc['asset_ids']: s.asset(aid)
 
-def compile_workflow(name,doc):
+def compile_workflow(name,doc,indices=None):
     plan=cards(doc.get('cards'));nodes=[];edges=[]
-    for i,c in enumerate(plan):
+    if indices is None:indices=list(range(len(plan)))
+    if not indices or len(set(indices))!=len(indices) or any(type(i)!=int or not 0<=i<len(plan) for i in indices):fail(400,'请选择有效且不重复的画面序号')
+    for i in indices:
+        c=plan[i]
         sid=f'scene_{i+1}';gen=f'generate_{i+1}'
         prompt=(doc['style']+'\n' if doc.get('style') else '')+c['prompt']
         params={'model_id':doc['model_id'],'size':doc['size']}

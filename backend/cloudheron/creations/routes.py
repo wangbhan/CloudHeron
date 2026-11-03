@@ -2,7 +2,7 @@ import copy
 from typing import Annotated,Literal
 from psycopg.types.json import Jsonb
 from fastapi import Header,Response
-from pydantic import Field
+from pydantic import Field,StrictInt
 from ..schemas import Contract,JobOut,Revision,WorkflowOut
 from ..security import uid,text,fail,permission
 from ..service import job_view
@@ -15,12 +15,15 @@ class CreationWrite(Contract):
     seconds:int=Field(default=4,ge=1,le=120);asset_ids:list[str]=Field(default_factory=list,max_length=8)
     cards:list[dict]=Field(default_factory=list,max_length=12)
 class CreationSave(CreationWrite): revision:int=Field(ge=1)
-class CreationRun(Revision): pass
+class CreationRun(Revision):
+    card_indices:list[StrictInt]|None=Field(default=None,min_length=1,max_length=12)
 
 def register(api,Svc):
     Key=Annotated[str|None,Header(alias='Idempotency-Key')]
     def view(s,c):
-        return {**c,'can_edit':permission(s.user,s.project(c['project_id']),True),'job':job_view(s.db.one("SELECT * FROM jobs WHERE source_id=%s AND source IN ('creation','creation_plan') ORDER BY created_at DESC LIMIT 1",c['id']))}
+        j=s.db.one("SELECT * FROM jobs WHERE source_id=%s AND source IN ('creation','creation_plan') ORDER BY created_at DESC LIMIT 1",c['id'])
+        indices=j['snapshot'].get('card_indices') if j and j['source']=='creation' else None
+        return {**c,'run_card_indices':indices,'can_resume':bool(j and j['source']=='creation' and j['snapshot'].get('card_titles')==[x['title'] for x in c['document']['cards']]),'can_edit':permission(s.user,s.project(c['project_id']),True),'job':job_view(j)}
     def read(s,cid,edit=False):
         c=s.db.one('SELECT * FROM creations WHERE id=%s',cid)
         if not c: fail(404,'集成创作不存在')
@@ -55,7 +58,7 @@ def register(api,Svc):
             doc=current['document'];config(s,doc,mode=='creation')
             snap={'revision':current['revision'],'document':copy.deepcopy(doc),'name':current['name']}
             if mode=='creation':
-                definition=compile_workflow(current['name'],doc);s.wf_resources(definition);snap={'document':definition,'creation_revision':current['revision']}
+                definition=compile_workflow(current['name'],doc,b.card_indices);s.wf_resources(definition);snap={'document':definition,'creation_revision':current['revision'],'card_titles':[x['title'] for x in doc['cards']],'card_indices':b.card_indices if b.card_indices is not None else list(range(len(doc['cards'])))}
             return s.enqueue(c['project_id'],mode,cid,snap)
         j,replayed=s.submit(mode+':'+cid,key,b.model_dump(),build)
         if replayed:response.headers['Idempotency-Replayed']='true'

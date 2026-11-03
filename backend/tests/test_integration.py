@@ -129,7 +129,7 @@ def test_asset_bucket_range_and_signed(env):
     assert 'file' not in a;assert c.get(a['url']).content==PNG
     partial=c.get(a['url'],headers={'Range':'bytes=0-7'});assert partial.status_code==206;assert partial.content==PNG[:8]
     assert c.get(a['url'],headers={'Range':'bad'}).status_code==416
-    signed=c.post('/api/assets/'+a['id']+'/download-url',json={}).json();assert signed['expires_in']==300;assert httpx.get(signed['url']).content==PNG
+    signed=c.post('/api/assets/'+a['id']+'/download-url',json={}).json();assert signed['expires_in']==300;assert httpx.get(signed['url'],trust_env=False).content==PNG
     parent=c.post('/api/assets',json={'parent_id':a['id'],'project_id':env['project']['id'],'name':'参考 v2','kind':'character','visibility':'team','mime':'image/png','filename':'ref.png','base64':base64.b64encode(PNG).decode()});assert parent.status_code==201;assert parent.json()['version']==2;assert parent.json()['metadata']['family_id']==a['id']
     assert c.post('/api/assets',json={'name':'bad','kind':'image','visibility':'team','mime':'image/png','filename':'bad.png','base64':'YWRmbm90aW1hZ2U='}).status_code==400
 
@@ -169,6 +169,23 @@ def test_ai_proposal_confirm_once_no_execution(env):
     p=proposal.json();assert c.get('/api/workflows/'+w['id']).json()['revision']==w['revision']
     confirmed=c.post('/api/proposals/'+p['id']+'/confirm',json={});assert confirmed.status_code==200;env['workflow']=confirmed.json();assert c.post('/api/proposals/'+p['id']+'/confirm',json={}).status_code==409
     after=c.get('/api/system/status').json();assert (before['queued'],before['running'])==(after['queued'],after['running'])
+
+def test_ai_missing_layout_proposal_normalized_before_confirmation(env):
+    c=env['client'];w=c.get('/api/workflows/'+env['workflow']['id']).json();doc=copy.deepcopy(w['document'])
+    for n in doc['nodes']:n.pop('position',None)
+    doc['nodes'][0].pop('params',None);env['state']['proposal']=doc
+    before=c.get('/api/system/status').json()
+    p=c.post('/api/workflows/'+w['id']+'/assist',json={'mode':'modify','model_id':env['model']['id'],'prompt':'示例调整'})
+    assert p.status_code==200,p.text
+    assert p.json()['after']['nodes'][0]['params']==w['document']['nodes'][0]['params']
+    assert c.get('/api/workflows/'+w['id']).json()['revision']==w['revision']
+    saved=c.post('/api/proposals/'+p.json()['id']+'/confirm',json={});assert saved.status_code==200,saved.text
+    env['workflow']=saved.json();after=c.get('/api/system/status').json()
+    assert (before['queued'],before['running'])==(after['queued'],after['running'])
+    bad=copy.deepcopy(doc);bad['nodes'][0]['position']={'x':'invalid','y':0};env['state']['proposal']=bad
+    failed=c.post('/api/workflows/'+w['id']+'/assist',json={'mode':'modify','model_id':env['model']['id'],'prompt':'错误格式'})
+    assert failed.status_code==422 and bad['nodes'][0]['id'] in failed.text
+    assert c.get('/api/workflows/'+w['id']).json()['revision']==saved.json()['revision']
 
 def test_idempotency_concurrency_conflict_and_published_api(env):
     c=env['client'];w=env['workflow'];key='integration-key';r=c.post('/api/workflows/'+w['id']+'/run',json={'revision':w['revision']},headers={'Idempotency-Key':key});assert r.status_code==202
@@ -340,6 +357,21 @@ def test_guided_permissions_validation_and_planning_failure(env):
         r=c.post('/api/creations/'+item['id']+'/plan',json={'revision':1});j=call_job(env,r.json()['id']);assert j['status']=='failed';assert 'JSON' in j['error']
         assert c.get('/api/creations/'+item['id']).json()['revision']==1
     finally:env['state'].pop('plan_response',None)
+
+def test_guided_selected_frames_only_and_retry_unfinished(env):
+    c=env['client'];item,doc=creation(env,'image',3,True);base='/api/creations/'+item['id']
+    for bad in ([],[0,0],[-1],[3],[True]):assert c.post(base+'/run',json={'revision':1,'card_indices':bad}).status_code in (400,422)
+    before=len(env['state']['received']);r=c.post(base+'/run',json={'revision':1,'card_indices':[1]},headers={'Idempotency-Key':'select-frame'})
+    assert r.status_code==202,r.text;j=call_job(env,r.json()['id']);assert len(j['outputs'])==1 and 'generate_2' in j['steps'] and 'generate_1' not in j['steps']
+    assert c.get(base).json()['run_card_indices']==[1]
+    assert c.post(base+'/run',json={'revision':1,'card_indices':[1]},headers={'Idempotency-Key':'select-frame'}).json()['id']==j['id']
+    assert len(env['state']['received'])==before+1
+    doc['cards'][1]['prompt']='FAIL_THIS_FRAME';assert c.put(base,json=doc|{'revision':1}).status_code==200
+    failed=call_job(env,c.post(base+'/run',json={'revision':2}).json()['id']);assert failed['status']=='failed'
+    doc['cards'][1]['prompt']='fixed';assert c.put(base,json=doc|{'revision':2}).status_code==200
+    before=len(env['state']['received']);run=c.post(base+'/run',json={'revision':3,'card_indices':[1,2]});j=call_job(env,run.json()['id'])
+    assert len(j['outputs'])==2 and 'generate_1' not in j['steps'] and len(env['state']['received'])==before+2
+    assets=c.get('/api/assets').json();assert all(any(a['id']==aid for a in assets) for aid in failed['steps']['generate_1']['output']['asset_ids'])
 
 def test_guided_busy_revision_and_atomic_plan_completion(env):
     c=env['client'];item,doc=creation(env);gate=threading.Event();env['state']['hold']=gate

@@ -4,6 +4,7 @@ from psycopg.types.json import Jsonb
 from fastapi import Request,Response,Header,Depends,Security
 from fastapi.security import HTTPBearer,HTTPAuthorizationCredentials
 from .schemas import *
+from .workflow_ai import CONTRACT as AI_CONTRACT,proposal as ai_proposal
 from .security import fail,uid,text,permission,token,digest,now_ms
 from .domain import TEMPLATES,AGENTS,NODES,workflow,copy_template,options
 from .service import Service,asset_view,job_view,template_view
@@ -65,14 +66,12 @@ def register(api,Svc,Db,settings,**kwargs):
     @api.post('/workflows/{workflow_id}/assist',response_model=AnalysisOut|ProposalOut,tags=['工作流 AI'])
     def assist(workflow_id:str,b:Assist,s:Svc):
         w=s.resource('workflows',workflow_id,True);params=options('text',b.params)
-        instruction='仅分析工作流，解释问题和建议。禁止执行任务。' if b.mode=='analyze' else '只返回 JSON 对象 {"explanation":"修改摘要","document":完整工作流JSON}。节点类型限定 '+','.join(NODES)+'；保留模型和资产编号，不执行任务。'
+        instruction='仅分析工作流，解释问题和建议。禁止执行任务。' if b.mode=='analyze' else AI_CONTRACT+'允许的节点类型：'+','.join(NODES)
         api_model=s.model(b.model_id);result=Provider(settings,s.context.vault,s.context.storage,None).chat(api_model,[{'role':'system','content':instruction},{'role':'user','content':json.dumps({'workflow':w['document'],'request':b.prompt},ensure_ascii=False)}],params)
         if b.mode=='analyze': return {'analysis':result}
-        try: proposal=json.loads(re.sub(r'\s*```$','',re.sub(r'^```(?:json)?\s*','',result)))
-        except ValueError: fail(422,'AI 返回格式有误，当前工作流保持原样')
-        s.wf_resources(proposal.get('document'));pid=uid('proposal');explanation=text(proposal.get('explanation'),'修改摘要',4000)
-        s.db.insert('proposals',{'id':pid,'workflow_id':w['id'],'user_id':s.user['id'],'base_revision':w['revision'],'document':proposal['document'],'explanation':explanation,'expires':now_ms()+3600000})
-        return {'id':pid,'base_revision':w['revision'],'explanation':explanation,'before':w['document'],'after':proposal['document']}
+        document,explanation=ai_proposal(result,w['document']);s.wf_resources(document);pid=uid('proposal')
+        s.db.insert('proposals',{'id':pid,'workflow_id':w['id'],'user_id':s.user['id'],'base_revision':w['revision'],'document':document,'explanation':explanation,'expires':now_ms()+3600000})
+        return {'id':pid,'base_revision':w['revision'],'explanation':explanation,'before':w['document'],'after':document}
     @api.post('/proposals/{proposal_id}/confirm',response_model=WorkflowOut,response_model_exclude_unset=True,tags=['工作流 AI'])
     def confirm(proposal_id:str,s:Svc):
         with s.db.tx():

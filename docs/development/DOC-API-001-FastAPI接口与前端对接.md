@@ -203,3 +203,7 @@ POST /api/creations/{id}/plan：{revision}，202返回creation_plan Job；POST .
 POST /api/creations/{id}/workflow：{revision}，201返回普通工作流，仅保存不运行。所有写操作需要X-CloudHeron:1与项目编辑权限，查看者仅可读。
 
 模型列表检测增加scope=model_list、generation_verified=false；文本格式可选responses。默认端点主机根地址加/v1，自定义paths优先，版本基地址保持；Responses将max_tokens映射max_output_tokens，读取output_text内容块。实际生成验收复用现有chats/messages/jobs API，不使用列表检测结果替代生成状态。当前OpenAPI57路径71操作。
+
+## v0.3.2 批量选择与AI格式兼容
+
+POST /api/creations/{id}/run请求为`{"revision":3,"card_indices":[1,2]}`，0起始索引，省略执行全部，空/重复/越界400，非整数422。响应仍202 JobOut；GET creation新增run_card_indices供显示本次节点。POST chats/{id}/messages使用Idempotency-Key避免未知受理结果重复提交。AI assist响应结构保持，modify摘要说明布局兼容，坏字段指明节点，确认仍单独请求。OpenAPI57路径71操作。
