@@ -24,6 +24,9 @@ class WorkflowCreate(Contract): project_id:str;name:str;document:dict[str,Any]|N
 class WorkflowValidate(Contract): project_id:str;document:dict[str,Any]
 class WorkflowSave(Contract): revision:int=Field(ge=1);document:dict[str,Any]
 class Revision(Contract): revision:int=Field(ge=1)
+class ContextSelection(Contract):
+    context_revision: int | None = Field(default=None, ge=1, strict=True)
+class WorkflowRun(Revision, ContextSelection): pass
 class Restore(Revision): source_revision:int=Field(ge=1)
 class JobOut(BaseModel):
     id:str;project_id:str;owner_id:str;source:str;source_id:str;publication_id:str|None=None
@@ -31,7 +34,7 @@ class JobOut(BaseModel):
     created_at:datetime;updated_at:datetime
 class WorkflowOut(BaseModel): id:str;project_id:str;name:str;document:dict[str,Any];revision:int;updated_at:datetime;can_edit:bool|None=None;job:JobOut|None=None
 class ChatCreate(Contract): project_id:str;title:str
-class ChatMessage(Contract): prompt:str=Field(min_length=1,max_length=32000);config:dict[str,Any]
+class ChatMessage(ContextSelection): prompt:str=Field(min_length=1,max_length=32000);config:dict[str,Any]
 class ChatOut(BaseModel): id:str;project_id:str;title:str;messages:list[dict[str,Any]]|None=None;updated_at:datetime;can_edit:bool|None=None;job:JobOut|None=None
 class AssetCreate(Contract): name:str;kind:Literal['image','video','character','scene','prop','style'];visibility:Literal['team','private'];mime:str;base64:str;filename:str;project_id:str|None=None;parent_id:str|None=None;description:str=''
 class AssetUpdate(Contract): name:str;visibility:Literal['team','private'];description:str=''
@@ -44,7 +47,7 @@ class ExpertOut(ExpertWrite): id:str;builtin:bool
 class TemplateSave(Contract): workflow_id:str;revision:int;name:str;description:str=''
 class TemplateInstantiate(Contract): project_id:str;revision:int;name:str;keep_bindings:bool=False
 class TemplateOut(BaseModel): source_workflow_id:str|None=None;source_revision:int|None=None;updated_at:datetime|None=None;id:str;project_id:str|None=None;owner_id:str|None=None;name:str;description:str;revision:int;builtin:bool=False;node_count:int;edge_count:int;document:dict[str,Any]|None=None
-class Assist(Contract): mode:Literal['analyze','modify'];model_id:str;prompt:str=Field(min_length=1,max_length=10000);params:dict[str,Any]={}
+class Assist(ContextSelection): mode:Literal['analyze','modify'];model_id:str;prompt:str=Field(min_length=1,max_length=10000);params:dict[str,Any]={}
 class AnalysisOut(BaseModel): analysis:str
 class ProposalOut(BaseModel): id:str;base_revision:int;explanation:str;before:dict[str,Any];after:dict[str,Any]
 class PublicationCreate(Contract): workflow_id:str;name:str;version:str

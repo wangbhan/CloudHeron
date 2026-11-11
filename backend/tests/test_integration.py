@@ -384,6 +384,75 @@ def test_guided_busy_revision_and_atomic_plan_completion(env):
     assert call_job(env,r.json()['id'])['status']=='completed'
     assert c.put('/api/creations/'+item['id'],json={**doc,'revision':1}).status_code==409
 
+def test_project_context_permissions_and_immutable_revisions(env):
+    client = env['client']
+    project = client.post('/api/projects', json={'name': '设定权限项目', 'visibility': 'private'}).json()
+    route = '/api/projects/' + project['id'] + '/context'
+    assert client.get(route).json() == []
+    assert env['viewer'].get(route).status_code == 403
+    payload = {'base_revision': 0, 'description': '第一版', 'style': '水墨', 'asset_ids': []}
+    assert env['editor'].post(route, json=payload).status_code == 403
+    other_asset = env['asset']['id']
+    assert client.post(route, json={**payload, 'asset_ids': [other_asset]}).status_code == 400
+    first = client.post(route, json=payload)
+    assert first.status_code == 201
+    assert first.json()['revision'] == 1
+    assert client.post(route, json=payload).status_code == 409
+    second = client.post(route, json={**payload, 'base_revision': 1, 'description': '第二版'})
+    assert second.status_code == 201
+    assert [(v['revision'], v['description']) for v in client.get(route).json()] == [
+        (2, '第二版'), (1, '第一版'),
+    ]
+
+
+def test_explicit_project_context_in_chat_canvas_and_batch(env):
+    client, received = env['client'], env['state']['received']
+    project_id = env['project']['id']
+    context_route = '/api/projects/' + project_id + '/context'
+    original = '古塔设定第一版'
+    payload = {'base_revision': 0, 'description': original, 'style': '冷蓝水墨', 'asset_ids': [env['asset']['id']]}
+    first = client.post(context_route, json=payload)
+    assert first.status_code == 201
+    assert env['viewer'].get(context_route).json()[0]['asset_ids'] == [env['asset']['id']]
+    assert env['viewer'].post(context_route, json=payload).status_code == 403
+    assert client.post(context_route, json={**payload, 'base_revision': 1, 'description': '新版设定'}).status_code == 201
+
+    message_route = '/api/chats/' + chat(env) + '/messages'
+    message = {'prompt': '创作描述', 'config': config(env, 'prompt'), 'context_revision': 1}
+    assert client.post(message_route, json={**message, 'context_revision': 100}).status_code == 404
+    sent = client.post(message_route, json=message, headers={'Idempotency-Key': 'context-1'})
+    assert sent.status_code == 202
+    assert call_job(env, sent.json()['id'])['status'] == 'completed'
+    assert original in received[-1]['body']['messages'][-1]['content']
+    assert '新版设定' not in received[-1]['body']['messages'][-1]['content']
+    replay = client.post(message_route, json=message, headers={'Idempotency-Key': 'context-1'})
+    assert replay.json()['id'] == sent.json()['id']
+    assert client.post(message_route, json={**message, 'context_revision': 2}, headers={'Idempotency-Key': 'context-1'}).status_code == 409
+
+    workflow = env['workflow']
+    workflow_route = '/api/workflows/' + workflow['id']
+    analyzed = client.post(workflow_route + '/assist', json={
+        'mode': 'analyze', 'model_id': env['model']['id'], 'prompt': '检查画布', 'context_revision': 1,
+    })
+    assert analyzed.status_code == 200
+    context = json.loads(received[-1]['body']['messages'][-1]['content'])['project_context']
+    assert context == {'revision': 1, 'description': original, 'style': '冷蓝水墨'}
+    run = client.post(workflow_route + '/run', json={'revision': workflow['revision'], 'context_revision': 1})
+    assert run.status_code == 202
+    assert call_job(env, run.json()['id'])['status'] == 'completed'
+    assert original in received[-1]['body']['prompt']
+
+    creation = client.post('/api/creations', json={
+        'project_id': project_id, 'name': '项目设定批量', 'story': '白鹭穿云', 'context_revision': 1,
+        'model_id': env['model']['id'], 'cards': [{'title': '第一幕', 'prompt': '穿过云海'}],
+    })
+    assert creation.status_code == 201
+    batch = client.post('/api/creations/' + creation.json()['id'] + '/run', json={'revision': 1})
+    assert batch.status_code == 202
+    assert call_job(env, batch.json()['id'])['status'] == 'completed'
+    assert original in received[-1]['body']['prompt']
+
+
 def test_pg_single_executor_and_restart_queue(env):
     with pytest.raises(RuntimeError,match='已有云鹭执行器'):
         with TestClient(create_app(env['settings'])):pass

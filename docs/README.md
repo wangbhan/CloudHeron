@@ -71,3 +71,7 @@
 ## v0.3.2 创作操作（2026-11-03）
 
 [设计](design/DOC-DES-017-画布AI与批量对话操作设计.md) · [开发](development/DOC-DEV-015-画布AI与创作操作实施.md) · [测试](testing/DOC-TST-013-画布批量与对话操作验收.md) · [上线](release/DOC-REL-009-创作操作发布与回退.md)。REQ-051，新增手动TST-059～061。
+
+## v0.3.3 迈谷风格与项目设定（2026-11-11）
+
+[设计](design/DOC-DES-018-迈谷风格与项目设定.md) · [开发](development/DOC-DEV-016-主题与项目设定实施.md) · [测试](testing/DOC-TST-014-主题与创作回归.md) · [发布](release/DOC-REL-010-主题与项目设定发布.md)

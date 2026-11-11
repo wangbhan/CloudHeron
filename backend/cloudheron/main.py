@@ -21,7 +21,7 @@ from .service import Service,asset_view,job_view,template_view
 from .worker import Worker
 from .provider import Provider
 
-VERSION='0.3.2';cookie_scheme=APIKeyCookie(name='cloudheron',auto_error=False);bearer_scheme=HTTPBearer(auto_error=False)
+VERSION='0.3.3';cookie_scheme=APIKeyCookie(name='cloudheron',auto_error=False);bearer_scheme=HTTPBearer(auto_error=False)
 def seed(d):
     skills=[('skill_visual','画面提示词','image','主体、环境、光线与构图：{{prompt}}'),('skill_motion','视频动作描述','video','明确主体动作与运镜，避免无关切换：{{prompt}}'),('skill_reference','参考资产注入','all','保持参考资产的外观、服装与风格。{{prompt}}'),('skill_structure','提示词结构整理','prompt','将创作要求组织为主体、环境、光线、构图或动作：{{prompt}}'),('skill_concise','提示词精炼','prompt','去除重复描述，只输出提示词：{{prompt}}')]
     for sid,name,task,t in skills: d.run('INSERT INTO skills(id,name,task,template,builtin) VALUES(%s,%s,%s,%s,true) ON CONFLICT(id) DO NOTHING',sid,name,task,t)
@@ -217,7 +217,9 @@ def create_app(settings:Settings|None=None):
     def update_expert(expert_id:str,b:ExpertWrite,s:Svc): return write_expert(s,b,expert_id)
     # Workflow, media and public endpoints are registered separately, preserving explicit OpenAPI paths.
     from .routes import register
-    register(api,Svc,Db,settings,requestRecord=None)
+    register(api,Svc,Db,settings,version=VERSION)
+    from .project_context import register as register_project_context
+    register_project_context(api,Svc)
     app.include_router(api)
     app.mount('/',StaticFiles(directory=settings.frontend_dir,html=True),name='frontend')
     return app

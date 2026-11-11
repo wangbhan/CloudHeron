@@ -19,10 +19,10 @@ def test_background_start_duplicate_restart_preserves_login_and_stops(tmp_path):
     with psycopg.connect(admin,autocommit=True) as conn:conn.execute(sql.SQL('CREATE DATABASE {}').format(sql.Identifier(name)))
     env={**os.environ,'DATABASE_URL':target,'DEV_STORAGE':'moto','PORT':str(port),'CLOUDHERON_RUN_DIR':str(tmp_path/'runtime'),'S3_BUCKET':'cloudheron-service-qa-'+os.urandom(4).hex(),'S3_CREATE_BUCKET':'true'}
     try:
-        r,first=invoke('start',env);assert r.returncode==0,(r.stdout,r.stderr);assert first['status']=='ready';assert first['version']=='0.3.2'
+        r,first=invoke('start',env);assert r.returncode==0,(r.stdout,r.stderr);assert first['status']=='ready';assert first['version']=='0.3.3'
         r,again=invoke('start',env);assert r.returncode==0;assert again['pid']==first['pid']
         with httpx.Client(base_url=f'http://127.0.0.1:{port}',headers={'X-CloudHeron':'1'},trust_env=False) as c:
-            assert c.get('/').status_code==200;assert c.get('/docs').status_code==200;assert c.get('/openapi.json').json()['info']['version']=='0.3.2'
+            assert c.get('/').status_code==200;assert c.get('/docs').status_code==200;assert c.get('/openapi.json').json()['info']['version']=='0.3.3'
             assert c.post('/api/setup',json={'team':'服务测试','name':'QA','email':'service@fixture.test','password':'fixture-password-123'}).status_code==201
             user=c.get('/api/me').json()['user']['id']
         r,reloaded=invoke('reload',env);assert r.returncode==0;assert reloaded['storage_pid']==first['storage_pid']

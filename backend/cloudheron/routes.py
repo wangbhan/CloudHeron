@@ -10,6 +10,7 @@ from .domain import TEMPLATES,AGENTS,NODES,workflow,copy_template,options
 from .service import Service,asset_view,job_view,template_view
 from .storage import sniff
 from .provider import Provider
+from .project_context import load_context
 
 def register(api,Svc,Db,settings,**kwargs):
     IdKey=Annotated[str|None,Header(alias='Idempotency-Key')]
@@ -55,19 +56,25 @@ def register(api,Svc,Db,settings,**kwargs):
         if not v: fail(404,'历史版本不存在')
         return s.save_workflow(w,b.revision,v['document'],'restore',b.source_revision)
     @api.post('/workflows/{workflow_id}/run',response_model=JobOut,status_code=202,tags=['任务'])
-    def run(workflow_id:str,b:Revision,response:Response,s:Svc,idempotency_key:IdKey=None):
+    def run(workflow_id:str,b:WorkflowRun,response:Response,s:Svc,idempotency_key:IdKey=None):
         w=s.resource('workflows',workflow_id,True)
         def build():
             if w['revision']!=b.revision: fail(409,'请保存或刷新工作流再运行')
-            workflow(w['document']);return s.enqueue(w['project_id'],'workflow',w['id'],{'document':w['document'],'input':{}})
-        j,replayed=s.submit('workflow:'+w['id'],idempotency_key,b.model_dump(),build)
+            workflow(w['document'])
+            context=load_context(s,w['project_id'],b.context_revision)
+            return s.enqueue(w['project_id'],'workflow',w['id'],{'document':w['document'],'input':{},'project_context':context})
+        j,replayed=s.submit('workflow:'+w['id'],idempotency_key,b.model_dump(exclude_none=True),build)
         if replayed: response.headers['Idempotency-Replayed']='true'
         return j
     @api.post('/workflows/{workflow_id}/assist',response_model=AnalysisOut|ProposalOut,tags=['工作流 AI'])
     def assist(workflow_id:str,b:Assist,s:Svc):
         w=s.resource('workflows',workflow_id,True);params=options('text',b.params)
         instruction='仅分析工作流，解释问题和建议。禁止执行任务。' if b.mode=='analyze' else AI_CONTRACT+'允许的节点类型：'+','.join(NODES)
-        api_model=s.model(b.model_id);result=Provider(settings,s.context.vault,s.context.storage,None).chat(api_model,[{'role':'system','content':instruction},{'role':'user','content':json.dumps({'workflow':w['document'],'request':b.prompt},ensure_ascii=False)}],params)
+        context=load_context(s,w['project_id'],b.context_revision)
+        payload={'workflow':w['document'],'request':b.prompt}
+        if context:
+            payload['project_context']={k:context[k] for k in ('revision','description','style')}
+        api_model=s.model(b.model_id);result=Provider(settings,s.context.vault,s.context.storage,None).chat(api_model,[{'role':'system','content':instruction},{'role':'user','content':json.dumps(payload,ensure_ascii=False)}],params)
         if b.mode=='analyze': return {'analysis':result}
         document,explanation=ai_proposal(result,w['document']);s.wf_resources(document);pid=uid('proposal')
         s.db.insert('proposals',{'id':pid,'workflow_id':w['id'],'user_id':s.user['id'],'base_revision':w['revision'],'document':document,'explanation':explanation,'expires':now_ms()+3600000})
@@ -92,9 +99,15 @@ def register(api,Svc,Db,settings,**kwargs):
         def build():
             current=s.db.one('SELECT * FROM chats WHERE id=%s FOR UPDATE',chat_id)
             if s.db.one("SELECT id FROM jobs WHERE source_id=%s AND status IN ('queued','running')",chat_id): fail(409,'当前对话正在生成')
-            cfg=s.chat_config(b.config);prompt=text(b.prompt,'创作描述',32000);messages=current['messages']+[{'id':uid('msg'),'role':'user','text':prompt,'config':cfg,'at':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]
-            j=s.enqueue(c['project_id'],'chat',c['id'],{'prompt':prompt,'config':cfg,'messages':messages});s.db.run('UPDATE chats SET messages=%s,updated_at=now() WHERE id=%s',Jsonb(messages),chat_id);return j
-        j,replayed=s.submit('chat:'+chat_id,idempotency_key,b.model_dump(),build)
+            cfg=s.chat_config(b.config);prompt=text(b.prompt,'创作描述',32000)
+            context=load_context(s,c['project_id'],b.context_revision)
+            if context:
+                cfg['context_revision']=context['revision']
+            messages=current['messages']+[{'id':uid('msg'),'role':'user','text':prompt,'config':cfg,'at':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]
+            j=s.enqueue(c['project_id'],'chat',c['id'],{'prompt':prompt,'config':cfg,'messages':messages,'project_context':context})
+            s.db.run('UPDATE chats SET messages=%s,updated_at=now() WHERE id=%s',Jsonb(messages),chat_id)
+            return j
+        j,replayed=s.submit('chat:'+chat_id,idempotency_key,b.model_dump(exclude_none=True),build)
         if replayed: response.headers['Idempotency-Replayed']='true'
         return j
     @api.get('/assets',response_model=list[AssetOut],tags=['资产'])
@@ -132,7 +145,7 @@ def register(api,Svc,Db,settings,**kwargs):
     def job(job_id:str,s:Svc): return job_view(s.resource('jobs',job_id))
     @api.get('/system/status',response_model=RuntimeOut,tags=['运行管理'])
     def system_status(s:Svc):
-        s.admin();return {'version':'0.2.2','state':'draining' if s.context.closing else 'ready','workers':s.context.worker.state(),'max_pending_per_user':settings.max_pending_per_user,'queued':s.db.one("SELECT count(*) n FROM jobs WHERE status='queued'")['n'],'running':s.db.one("SELECT count(*) n FROM jobs WHERE status='running'")['n']}
+        s.admin();return {'version':kwargs.get('version','0.2.2'),'state':'draining' if s.context.closing else 'ready','workers':s.context.worker.state(),'max_pending_per_user':settings.max_pending_per_user,'queued':s.db.one("SELECT count(*) n FROM jobs WHERE status='queued'")['n'],'running':s.db.one("SELECT count(*) n FROM jobs WHERE status='running'")['n']}
     @api.get('/publications',response_model=list[PublicationOut],tags=['发布 API'])
     def publications(s:Svc): return [{k:v for k,v in p.items() if k not in ('key_hash','document')} for p in s.db.all('SELECT * FROM publications ORDER BY created_at DESC') if permission(s.user,s.db.one('SELECT * FROM projects WHERE id=%s',p['project_id']))]
     @api.post('/publications',response_model=PublicationCreated,status_code=201,tags=['发布 API'])

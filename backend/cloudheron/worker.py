@@ -58,9 +58,11 @@ class Worker:
                     msgs=c['messages']+[{'id':uid('msg'),'role':'assistant','text':'生成失败：'+error,'job_id':jid,'at':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}]
                     d.run('UPDATE chats SET messages=%s,updated_at=now() WHERE id=%s',Jsonb(msgs),c['id'])
     def execute(self,jid):
+        from .project_context import with_context
         try:
             with self.ctx.database.connection() as conn:
                 d=DB(conn);j=d.one('SELECT * FROM jobs WHERE id=%s',jid);snap=j['snapshot'];steps={}
+                project_context=snap.get('project_context')
                 user=d.one('SELECT * FROM users WHERE id=%s',j['owner_id']);s=Service(d,self.ctx,user)
                 def step(n,state,out=None,error=None):
                     steps[n]={'status':state}
@@ -77,22 +79,22 @@ class Worker:
                         record={'project_id':j['project_id'],'owner_id':j['owner_id'],'name':name,'kind':kind,'visibility':'private','metadata':{'job_id':jid,'source':j['source'],'source_id':j['source_id'],'node_id':nid}}
                     return s.save_asset(data,kind,j,record)
                 api=Provider(self.ctx.settings,self.ctx.vault,self.ctx.storage,save)
-                def generate(kind,mid,prompt,refs,p): principal();return api.generate(s.model(mid),kind,s.skills(prompt,p.get('skill_ids',[])),refs,p)
-                def chat(mid,prompt,p): principal();return api.chat(s.model(mid),[{'role':'system','content':'你是云鹭提示词 Agent，整理可用提示词。'},{'role':'user','content':s.skills(prompt,p.get('skill_ids',[]))}],p)
+                def generate(kind,mid,prompt,refs,p): principal();return api.generate(s.model(mid),kind,s.skills(with_context(prompt,project_context),p.get('skill_ids',[])),refs,p)
+                def chat(mid,prompt,p): principal();return api.chat(s.model(mid),[{'role':'system','content':'你是云鹭提示词 Agent，整理可用提示词。'},{'role':'user','content':s.skills(with_context(prompt,project_context),p.get('skill_ids',[]))}],p)
                 try:
                     principal();outputs=[];assistant=None;creation_update=None
                     if j['source']=='creation_plan':
                         from .creations.domain import parse_plan
                         doc=snap['document'];step('plan','running')
-                        result=api.chat(s.model(doc['text_model_id']),[{'role':'system','content':'将故事整理为指定数量的独立画面，人物和风格保持一致。只返回JSON对象，格式为{"cards":[{"title":"画面标题","prompt":"可直接用于生图或视频的完整描述"}]}，不输出其它内容。'},{'role':'user','content':str({'story':doc['story'],'style':doc['style'],'count':doc['count'],'kind':doc['kind']})}],{'max_tokens':4096})
+                        result=api.chat(s.model(doc['text_model_id']),[{'role':'system','content':'将故事整理为指定数量的独立画面，人物和风格保持一致。只返回JSON对象，格式为{"cards":[{"title":"画面标题","prompt":"可直接用于生图或视频的完整描述"}]}，不输出其它内容。'},{'role':'user','content':with_context(str({'story':doc['story'],'style':doc['style'],'count':doc['count'],'kind':doc['kind']}),project_context)}],{'max_tokens':4096})
                         doc['cards']=parse_plan(result,doc['count']);creation_update=doc;step('plan','completed',{'card_count':len(doc['cards'])})
                     elif j['source']=='chat':
                         cfg=snap['config'];step('agent','running');history=[{'role':m['role'],'content':m['text']} for m in snap['messages'] if m['role'] in ('user','assistant') and m.get('text')][-20:]
                         refs=[s.asset(a) for a in cfg['asset_ids']]
-                        if cfg['agent']=='prompt': result=api.chat(s.model(cfg['model_id']),[{'role':'system','content':'你是云鹭提示词 Agent，只返回可用提示词。'},*history[:-1],{'role':'user','content':s.skills(snap['prompt'],cfg['skill_ids'])}],cfg)
+                        if cfg['agent']=='prompt': result=api.chat(s.model(cfg['model_id']),[{'role':'system','content':'你是云鹭提示词 Agent，只返回可用提示词。'},*history[:-1],{'role':'user','content':s.skills(with_context(snap['prompt'],project_context),cfg['skill_ids'])}],cfg)
                         else:
                             prompt=snap['prompt']
-                            if cfg.get('text_model_id'): prompt=api.chat(s.model(cfg['text_model_id']),[{'role':'system','content':'结合创作历史整理生成提示词，只返回提示词。'},*history],cfg.get('text_options',{}))
+                            if cfg.get('text_model_id'): prompt=api.chat(s.model(cfg['text_model_id']),[{'role':'system','content':'结合创作历史整理生成提示词，只返回提示词。'},*history[:-1],{'role':'user','content':with_context(history[-1]['content'],project_context)}],cfg.get('text_options',{}))
                             elif len(history)>1: prompt='\n'.join(m['role']+': '+m['content'] for m in history)
                             outputs=generate(cfg['kind'],cfg['model_id'],prompt,refs,cfg);result=('图片' if cfg['kind']=='image' else '视频')+'已生成。'
                         step('agent','completed');assistant={'id':uid('msg'),'role':'assistant','text':result,'outputs':[a['id'] for a in outputs],'job_id':jid,'at':time.strftime('%Y-%m-%dT%H:%M:%SZ',time.gmtime())}

@@ -3,12 +3,13 @@ from typing import Annotated,Literal
 from psycopg.types.json import Jsonb
 from fastapi import Header,Response
 from pydantic import Field,StrictInt
-from ..schemas import Contract,JobOut,Revision,WorkflowOut
+from ..schemas import Contract,ContextSelection,JobOut,Revision,WorkflowOut
 from ..security import uid,text,fail,permission
 from ..service import job_view
+from ..project_context import load_context
 from .domain import cards,config,compile_workflow
 
-class CreationWrite(Contract):
+class CreationWrite(ContextSelection):
     project_id:str;name:str;story:str=Field(min_length=1,max_length=16000);style:str=Field(default='',max_length=2000)
     kind:Literal['image','video']='image';count:int=Field(default=3,ge=1,le=12)
     text_model_id:str='';model_id:str='';size:str=Field(default='1024x1024',min_length=1,max_length=80)
@@ -59,6 +60,7 @@ def register(api,Svc):
             snap={'revision':current['revision'],'document':copy.deepcopy(doc),'name':current['name']}
             if mode=='creation':
                 definition=compile_workflow(current['name'],doc,b.card_indices);s.wf_resources(definition);snap={'document':definition,'creation_revision':current['revision'],'card_titles':[x['title'] for x in doc['cards']],'card_indices':b.card_indices if b.card_indices is not None else list(range(len(doc['cards'])))}
+            snap['project_context']=load_context(s,c['project_id'],doc.get('context_revision'))
             return s.enqueue(c['project_id'],mode,cid,snap)
         j,replayed=s.submit(mode+':'+cid,key,b.model_dump(),build)
         if replayed:response.headers['Idempotency-Replayed']='true'

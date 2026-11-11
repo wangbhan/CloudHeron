@@ -207,3 +207,9 @@ POST /api/creations/{id}/workflow：{revision}，201返回普通工作流，仅�
 ## v0.3.2 批量选择与AI格式兼容
 
 POST /api/creations/{id}/run请求为`{"revision":3,"card_indices":[1,2]}`，0起始索引，省略执行全部，空/重复/越界400，非整数422。响应仍202 JobOut；GET creation新增run_card_indices供显示本次节点。POST chats/{id}/messages使用Idempotency-Key避免未知受理结果重复提交。AI assist响应结构保持，modify摘要说明布局兼容，坏字段指明节点，确认仍单独请求。OpenAPI57路径71操作。
+
+## v0.3.3 项目设定
+
+GET `/api/projects/{project_id}/context` 返回降序版本。POST 同一路径使用 `base_revision`（首次为 0）、`description`、`style`、`asset_ids` 创建版本。冲突为 409。项目描述最长 4000 字，视觉风格最长 1000 字，最多 8 个本项目资产版本。
+
+对话消息、工作流 AI 助手、工作流手动运行接受可选整数 `context_revision`。集成创作在作品文档保存该值，规划和执行提交时读取固定版本。选中的描述与风格作为文本上下文，参考资产使用原有显式选择。
