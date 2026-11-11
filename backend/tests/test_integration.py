@@ -229,6 +229,90 @@ def test_parallel_idempotency_limits_and_account_isolation(env):
     for item in [r[0],*others]:assert call_job(env,item.json()['id'])['status']=='completed'
     count=len(env['state']['received']);other=env['editor'].post('/api/workflows/'+w['id']+'/run',json={'revision':w['revision']},headers={'Idempotency-Key':'parallel-key'});assert other.status_code==202;assert other.json()['id']!=r[0].json()['id'];assert call_job(env,other.json()['id'])['status']=='completed';assert len(env['state']['received'])==count+1
 
+def test_worker_returns_connections_during_provider_and_storage_io(env, monkeypatch):
+    client = env['client']
+    ctx = env['app'].state.ctx
+    chat_id = chat(env, '外部 IO 等待')
+    provider_gate = threading.Event()
+    storage_gate = threading.Event()
+    storage_started = threading.Event()
+    requests_before = len(env['state']['received'])
+    put = ctx.storage.put
+
+    def blocking_put(key, data, mime):
+        storage_started.set()
+        if not storage_gate.wait(10):
+            raise RuntimeError('测试对象存储等待超时')
+        put(key, data, mime)
+
+    def pool_idle():
+        stats = ctx.database.pool.get_stats()
+        return stats['pool_available'] == stats['pool_size']
+
+    monkeypatch.setattr(ctx.storage, 'put', blocking_put)
+    env['state']['hold'] = provider_gate
+    try:
+        response = client.post(f'/api/chats/{chat_id}/messages', json={
+            'prompt': '连接池回归', 'config': config(env),
+        })
+        assert response.status_code == 202, response.text
+        job_id = response.json()['id']
+        wait(lambda: len(env['state']['received']) == requests_before + 1)
+        assert client.get(f'/api/jobs/{job_id}').json()['status'] == 'running'
+        wait(pool_idle)
+
+        provider_gate.set()
+        assert storage_started.wait(8)
+        assert client.get(f'/api/jobs/{job_id}').json()['status'] == 'running'
+        wait(pool_idle)
+    finally:
+        env['state']['hold'] = None
+        provider_gate.set()
+        storage_gate.set()
+    job = call_job(env, job_id)
+    assert job['status'] == 'completed', job
+    assert len(job['outputs']) == 1
+    assert client.get(f"/api/assets/{job['outputs'][0]}/media").content == PNG
+
+
+def test_worker_removes_uploaded_object_if_metadata_write_fails(env, monkeypatch):
+    client = env['client']
+    ctx = env['app'].state.ctx
+    chat_id = chat(env, '对象存储补偿')
+    put = ctx.storage.put
+    uploaded_keys = []
+
+    def record_put(key, data, mime):
+        put(key, data, mime)
+        uploaded_keys.append(key)
+
+    monkeypatch.setattr(ctx.storage, 'put', record_put)
+    with ctx.database.connection() as conn:
+        conn.execute("""
+            CREATE FUNCTION fixture_reject_asset() RETURNS trigger LANGUAGE plpgsql AS $$
+            BEGIN RAISE EXCEPTION 'fixture asset rollback'; END $$;
+            CREATE TRIGGER fixture_asset BEFORE INSERT ON assets
+            FOR EACH ROW EXECUTE FUNCTION fixture_reject_asset();
+        """)
+    try:
+        response = client.post(f'/api/chats/{chat_id}/messages', json={
+            'prompt': '补偿回归', 'config': config(env),
+        })
+        assert response.status_code == 202, response.text
+        job = call_job(env, response.json()['id'])
+        assert job['status'] == 'failed'
+        assert job['steps']['agent']['status'] == 'failed'
+        assert job['outputs'] == []
+        assert len(uploaded_keys) == 1
+        with ctx.database.connection() as conn:
+            assert conn.execute('SELECT id FROM assets WHERE file=%s', (uploaded_keys[0],)).fetchone() is None
+        objects = ctx.storage.client.list_objects_v2(Bucket=ctx.storage.bucket, Prefix=uploaded_keys[0])
+        assert objects['KeyCount'] == 0
+    finally:
+        with ctx.database.connection() as conn:
+            conn.execute('DROP TRIGGER fixture_asset ON assets; DROP FUNCTION fixture_reject_asset();')
+
+
 def test_request_and_completion_transactions(env):
     c=env['client'];cid=chat(env,'故障事务');ctx=env['app'].state.ctx
     with ctx.database.connection() as conn:

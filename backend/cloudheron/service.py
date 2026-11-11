@@ -1,4 +1,5 @@
-import base64,copy,json,re
+import base64,copy,json,logging,re
+from contextlib import contextmanager
 from psycopg.types.json import Jsonb
 from .db import now
 from .security import fail,uid,permission,text,digest,now_ms
@@ -9,6 +10,34 @@ def job_view(j): return {k:v for k,v in j.items() if k!='snapshot'} if j else No
 def asset_view(a): return {**{k:v for k,v in a.items() if k!='file'},'url':'/api/assets/'+a['id']+'/media'}
 def template_view(t,detail=False):
     d=t['document'];return {**t,'builtin':t.get('builtin',False),'document':d if detail else None,'node_count':len(d['nodes']),'edge_count':len(d['edges'])}
+@contextmanager
+def uploaded_asset(storage, data, kind, job=None, record=None):
+    mime = sniff(data)
+    if kind in ('image', 'video') and not mime.startswith(kind + '/'):
+        fail(400, '产物类型不匹配')
+    asset_id = uid('asset')
+    key = 'assets/' + asset_id + '.' + mime.split('/')[1]
+    if record is None:
+        record = {
+            'project_id': job['project_id'], 'owner_id': job['owner_id'],
+            'name': '生成' + ('图片' if kind == 'image' else '视频'),
+            'kind': kind, 'visibility': 'private',
+            'metadata': {'job_id': job['id'], 'source': job['source'], 'source_id': job['source_id']},
+        }
+    metadata = copy.deepcopy(record.get('metadata', {}))
+    metadata.setdefault('family_id', asset_id)
+    item = {**record, 'id': asset_id, 'mime': mime, 'file': key, 'metadata': metadata}
+    storage.put(key, data, mime)
+    try:
+        yield item
+    except Exception:
+        try:
+            storage.delete(key)
+        except Exception:
+            logging.getLogger(__name__).error('Failed to clean up unregistered asset %s', asset_id)
+        raise
+
+
 class Service:
     def __init__(self,db,context,user): self.db=db;self.context=context;self.user=user
     def editor(self):
@@ -123,13 +152,7 @@ class Service:
         self.db.insert('jobs',{'id':jid,'project_id':pid,'owner_id':self.user['id'],'source':source,'source_id':sid,'publication_id':publication_id,'snapshot':snapshot,'status':'queued'})
         return self.db.one('SELECT * FROM jobs WHERE id=%s',jid)
     def save_asset(self,data,kind,job=None,record=None):
-        mime=sniff(data);aid=uid('asset');key='assets/'+aid+'.'+mime.split('/')[1]
-        if kind in ('image','video') and not mime.startswith(kind+'/'): fail(400,'产物类型不匹配')
-        item=record or {'project_id':job['project_id'],'owner_id':job['owner_id'],'name':'生成'+('图片' if kind=='image' else '视频'),'kind':kind,'visibility':'private','metadata':{'job_id':job['id'],'source':job['source'],'source_id':job['source_id'],'family_id':aid}}
-        item={**item,'id':aid,'mime':mime,'file':key};item['metadata']=copy.deepcopy(item.get('metadata',{}));item['metadata'].setdefault('family_id',aid)
-        self.context.storage.put(key,data,mime)
-        try:
-            self.db.insert('assets',item)
-        except Exception:
-            self.context.storage.delete(key);raise
-        return self.db.one('SELECT * FROM assets WHERE id=%s',aid)
+        with uploaded_asset(self.context.storage, data, kind, job, record) as item:
+            with self.db.tx():
+                self.db.insert('assets', item)
+                return self.db.one('SELECT * FROM assets WHERE id=%s', item['id'])

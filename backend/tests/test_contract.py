@@ -31,7 +31,7 @@ def test_workflow_and_template_copy():
 def test_openapi_explicit_paths_and_secrets():
     settings=Settings(database_url='postgresql://fixture:fixture@127.0.0.1/fixture_test',vault_key_b64=base64.b64encode(b'k'*32).decode(),s3_bucket='qa',s3_access_key='fixture',s3_secret_key='fixture-secret')
     spec=create_app(settings).openapi()
-    assert spec['info']['version']=='0.3.3';assert '/api/chats/{chat_id}/messages' in spec['paths'];assert '/api/assets/{asset_id}/download-url' in spec['paths']
+    assert spec['info']['version']=='0.3.4';assert '/api/chats/{chat_id}/messages' in spec['paths'];assert '/api/assets/{asset_id}/download-url' in spec['paths']
     assert spec['paths']['/api/chats/{chat_id}/messages']['post']['requestBody']['content']['application/json']['schema']['$ref'].endswith('/ChatMessage')
     assert spec['paths']['/api/v1/endpoints/{endpoint_id}/runs']['post']['security']==[{'HTTPBearer':[]}]
     assert 'secret' not in spec['components']['schemas']['ModelOut']['properties'];assert 'password' not in spec['components']['schemas']['UserOut']['properties']

@@ -1,6 +1,6 @@
 # 云鹭 · CloudHeron 文档入口
 
-当前为开发阶段：RAW-011 接受 v0.3.2 界面并授权实现功能。DEV-001 至 DEV-028 已登记，前端代码在 app/public，新版后端在 backend。剩余需求细节保留；46 条手动用例已登记；正式验收与生产上线待执行。
+本机当前运行 v0.3.4。功能状态与验收入口见 [云鹭功能清单](DOC-FUN-001-功能清单与实现状态.md)。正式生产上线待执行。
 
 - [DOC-GOV-001 编号与阶段规则](DOC-GOV-001-编号与阶段规则.md)
 - [DOC-RAW-001 原始需求](requirements/DOC-RAW-001-原始需求记录.md)
@@ -75,3 +75,7 @@
 ## v0.3.3 迈谷风格与项目设定（2026-11-11）
 
 [设计](design/DOC-DES-018-迈谷风格与项目设定.md) · [开发](development/DOC-DEV-016-主题与项目设定实施.md) · [测试](testing/DOC-TST-014-主题与创作回归.md) · [发布](release/DOC-REL-010-主题与项目设定发布.md)
+
+## v0.3.4 生成执行与功能清单（2026-11-11）
+
+[功能清单](DOC-FUN-001-功能清单与实现状态.md) · [设计](design/DOC-DES-019-生成执行短连接设计.md) · [开发](development/DOC-DEV-017-生成执行短连接实施.md) · [测试](testing/DOC-TST-015-生成执行回归.md) · [发布](release/DOC-REL-011-生成执行更新与回退.md)
