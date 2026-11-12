@@ -79,3 +79,7 @@
 ## v0.3.4 生成执行与功能清单（2026-11-11）
 
 [功能清单](DOC-FUN-001-功能清单与实现状态.md) · [设计](design/DOC-DES-019-生成执行短连接设计.md) · [开发](development/DOC-DEV-017-生成执行短连接实施.md) · [测试](testing/DOC-TST-015-生成执行回归.md) · [发布](release/DOC-REL-011-生成执行更新与回退.md)
+
+## Docker 分离部署（2026-11-12）
+
+[DOC-REL-012 启动、独立 PostgreSQL、云桶、备份及验收](release/DOC-REL-012-Docker分离部署.md)

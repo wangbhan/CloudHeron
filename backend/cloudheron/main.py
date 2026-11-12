@@ -221,5 +221,6 @@ def create_app(settings:Settings|None=None):
     from .project_context import register as register_project_context
     register_project_context(api,Svc)
     app.include_router(api)
-    app.mount('/',StaticFiles(directory=settings.frontend_dir,html=True),name='frontend')
+    if settings.serve_frontend:
+        app.mount('/',StaticFiles(directory=settings.frontend_dir,html=True),name='frontend')
     return app

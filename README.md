@@ -18,6 +18,10 @@ cd /Users/bohan/work/AI漫剧
 
 [安装与云桶配置](backend/README.md) · [前端接口文档](docs/development/DOC-API-001-FastAPI接口与前端对接.md) · [统一入口发布记录](docs/release/DOC-REL-005-统一8800启动与回滚.md) · [全部文档](docs/README.md)
 
+## Docker 分离部署
+
+Nginx、FastAPI 和 PostgreSQL 分开运行。支持单独启动 PostgreSQL 或连接已有 PG，可配置私有云桶，也提供本机持久 S3 服务。 [Docker 启动、备份与验证](docs/release/DOC-REL-012-Docker分离部署.md)
+
 ## 手动验收
 
 管理员或编辑者打开顶栏“手动测试”，载入或重新载入测试项目。61条应用用例可记录和导出结果；原人工结果保留，样例不调用模型。TST-059～061验证画布、批量和对话操作，TST-062～063验证主题与项目设定；TST-049～052验证模型风格解耦；TST-047/048为设计与整体迁移验收。

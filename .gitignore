@@ -25,3 +25,6 @@ vault.key
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Docker deployment secrets
+.env.docker

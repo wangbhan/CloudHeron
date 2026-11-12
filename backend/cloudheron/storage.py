@@ -19,10 +19,12 @@ def sniff(data,mime=None):
     return found
 class Storage:
     def __init__(self,settings):
-        if settings.s3_endpoint_url and not settings.s3_endpoint_url.startswith('https://') and not settings.s3_allow_http: raise ValueError('云桶 endpoint 须为 HTTPS，开发 HTTP 需要显式允许')
-        self.bucket=settings.s3_bucket
-        local=urlsplit(settings.s3_endpoint_url or '').hostname in ('localhost','127.0.0.1','::1')
-        self.client=boto3.client('s3',endpoint_url=settings.s3_endpoint_url,region_name=settings.s3_region,aws_access_key_id=settings.s3_access_key,aws_secret_access_key=settings.s3_secret_key,config=Config(**({'proxies':{}} if local else {}),request_checksum_calculation='when_required',response_checksum_validation='when_required',signature_version='s3v4',s3={'addressing_style':settings.s3_addressing_style},connect_timeout=5,read_timeout=60,retries={'max_attempts':2}))
+        self.bucket = settings.s3_bucket
+        self.client = self.make_client(settings, settings.s3_endpoint_url)
+        self.signer = (
+            self.make_client(settings, settings.s3_public_endpoint_url)
+            if settings.s3_public_endpoint_url else self.client
+        )
         if settings.s3_create_bucket:
             try: self.client.head_bucket(Bucket=self.bucket)
             except ClientError as e:
@@ -35,6 +37,23 @@ class Storage:
             def without_expect(request,**kwargs):
                 if 'Expect' in request.headers: del request.headers['Expect']
             self.client.meta.events.register('before-sign.s3.PutObject',without_expect)
+    @staticmethod
+    def make_client(settings, endpoint):
+        if endpoint and not endpoint.startswith('https://') and not settings.s3_allow_http:
+            raise ValueError('云桶 endpoint 须为 HTTPS，开发 HTTP 需要显式允许')
+        local = urlsplit(endpoint or '').hostname in ('localhost', '127.0.0.1', '::1')
+        return boto3.client(
+            's3', endpoint_url=endpoint, region_name=settings.s3_region,
+            aws_access_key_id=settings.s3_access_key, aws_secret_access_key=settings.s3_secret_key,
+            config=Config(
+                proxies={} if local else None,
+                request_checksum_calculation='when_required',
+                response_checksum_validation='when_required',
+                signature_version='s3v4', s3={'addressing_style': settings.s3_addressing_style},
+                connect_timeout=5, read_timeout=60, retries={'max_attempts':2},
+            ),
+        )
+
     def check(self): self.client.head_bucket(Bucket=self.bucket)
     def put(self,key,data,mime): self.client.put_object(Bucket=self.bucket,Key=key,Body=data,ContentType=mime)
     def delete(self,key): self.client.delete_object(Bucket=self.bucket,Key=key)
@@ -42,7 +61,7 @@ class Storage:
         body=self.client.get_object(Bucket=self.bucket,Key=key)['Body']
         try: return body.read(100*1024*1024+1)
         finally: body.close()
-    def url(self,key): return self.client.generate_presigned_url('get_object',Params={'Bucket':self.bucket,'Key':key},ExpiresIn=300)
+    def url(self,key): return self.signer.generate_presigned_url('get_object',Params={'Bucket':self.bucket,'Key':key},ExpiresIn=300)
     def response(self,key,mime,range_header=None):
         args={'Bucket':self.bucket,'Key':key}
         if range_header:

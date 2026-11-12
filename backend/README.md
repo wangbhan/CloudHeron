@@ -59,9 +59,9 @@ cd /Users/bohan/work/AI漫剧/backend
 
 35 项覆盖真实 PostgreSQL 事务、权限、任务去重、重启恢复、迁移、HTTP 模型调用和 S3 模拟器。不会调用收费模型。手动在新版顶栏“手动测试”点“重新载入测试项目”，执行 TST-037～046，并保存自己的实际结果。真实模型和真实云桶验证仍需要部署配置，参见 [测试记录](../docs/testing/DOC-TST-007-FastAPI迁移验证记录.md)。
 
-## 容器开发方案
+## 容器部署
 
-`compose.yaml` 提供 PostgreSQL + 持久 MinIO + API 的开发组合；根目录 `.dockerignore` 排除本地数据与 `.env`。本次 Docker 引擎未成功启动，容器镜像构建和 Compose 运行尚未验证。运行前停止占用 55432/59000/8800 的本机开发实例，再在 backend 执行 `docker compose --env-file .env up --build -d`。此配置创建本地私有桶，与真实云桶部署分开。
+当前分离部署从项目根目录运行。前端、API、PG 与可选开发桶的启动和备份见 [DOC-REL-012](../docs/release/DOC-REL-012-Docker分离部署.md)。本目录的 Compose 文件保留旧版合并启动方式。
 
 ## 运行约束
 

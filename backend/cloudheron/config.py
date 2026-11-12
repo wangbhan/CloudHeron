@@ -5,12 +5,13 @@ from pydantic import Field, field_validator
 
 ROOT = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file='.env', extra='ignore', case_sensitive=False)
+    model_config = SettingsConfigDict(env_file='.env', env_ignore_empty=True, extra='ignore', case_sensitive=False)
     dev_storage: Literal["external","moto"] = "external"
     database_url: str
     vault_key_b64: str
     s3_bucket: str
     s3_endpoint_url: str | None = None
+    s3_public_endpoint_url: str | None = None
     s3_region: str = 'us-east-1'
     s3_access_key: str | None = None
     s3_secret_key: str | None = None
@@ -18,6 +19,7 @@ class Settings(BaseSettings):
     s3_create_bucket: bool = False
     s3_allow_http: bool = False
     s3_disable_expect: bool = False
+    serve_frontend: bool = True
     frontend_dir: Path = ROOT / 'app/public'
     cors_origins: list[str] = []
     cookie_secure: bool = False
