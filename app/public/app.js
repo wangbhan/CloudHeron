@@ -1,3 +1,4 @@
+import {createWorkflowHistory,workflowHistoryShortcut} from './features/workflow-history.js';
 import {createProjectContext} from './features/project-context.js';
 import {createStudioFeature} from './features/studio/index.js';
 import {createModelFeature} from './features/models/index.js';
@@ -64,11 +65,11 @@ function workflowPage(){
   if(state.workflowView==='templates')return templateLibraryPage();
   const w=state.w;if(!w)return `<div class="page" data-req="REQ-036">${head('节点工作流','按项目管理工作流，保存 JSON 后手动运行。',btn('模板库','templates-open')+(editable()?btn('导入 JSON','workflow-import-new')+btn('新建工作流','workflow-new','primary','','plus'):''))}<div class="toolbar">${projectPicker('workflow',state.collectionProject.workflow)}</div><div class="project-groups">${collectionGroups('workflow',state.workflows,w=>`<a class="card list-card" href="#workflow/${w.id}"><div>${I('workflow')}<h3>${escape(w.name)}</h3></div>${I('arrow')}</a>`)}</div>${!state.projects.length?empty('还没有项目，可新建工作流并同时创建项目。',editable()?btn('新建工作流','workflow-new','primary'):''):''}</div>`;
   const n=w.document.nodes.find(n=>n.id===state.selected),can=w.can_edit;
-  return `<div class="workflow-product" data-req="REQ-005 REQ-006 REQ-007 REQ-008 REQ-009 REQ-010 REQ-011"><div class="wf-heading"><div><a href="#workflow/project/${w.project_id}" class="note">工作流 / ${escape(projectName(w.project_id))}</a>${projectPicker('workflow',w.project_id)}<h2>${escape(w.name)} <span class="note" id="dirty-label">${state.dirty?'未保存':'已保存 · r'+w.revision}</span></h2></div><div class="row">${(can?btn('导入 JSON','workflow-import'):'')+btn('查看 JSON','workflow-json')}${btn('导出 JSON','workflow-export')}${btn('版本历史','workflow-versions')}${can?btn('保存为模板','template-save')+btn('新建','workflow-new')+btn('AI 修改','workflow-ai')+btn('另存为','workflow-clone')+btn('保存','workflow-save','','','save')+btn('手动运行','workflow-run','primary',w.job&&['running','queued'].includes(w.job.status)?'disabled':'','play'):''}</div></div><div id="workflow-run-summary" class="wf-run-summary">${runSummary(w.job)}</div>${can&&state.contextVersions?.length?`<div class="workflow-context">${projectContext.picker('workflow-context',state.workflowContext?.[w.id])}</div>`:''}<div class="wf-body"><aside class="node-library"><h3>任务节点</h3><p class="note">点击添加到画布</p>${Object.entries(nodeNames).map(([type,name])=>btn(name,'node-add','node-library-item',`data-type="${type}" ${can?'':'disabled'}`,nodeTone[type])).join('')}<div class="node-hint">选择输出端口，再点击目标节点的输入端口连接。拖动节点标题调整位置。</div></aside><section class="canvas-area"><div class="canvas-scroller"><div class="canvas-extent" style="width:${canvasSize().width*state.zoom}px;height:${canvasSize().height*state.zoom}px"><div class="workflow-canvas" id="workflow-canvas" style="transform:scale(${state.zoom})"><svg id="edges" width="${canvasSize().width}" height="${canvasSize().height}" aria-label="节点连线">${edgesSVG()}</svg>${w.document.nodes.map(nodeHTML).join('')}</div></div></div><div class="canvas-footer"><div class="row"><select id="canvas-zoom" aria-label="画布缩放" class="zoom-select">${[.4,.6,.8,1,1.2].map(z=>`<option value="${z}" ${state.zoom===z?'selected':''}>${Math.round(z*100)}%</option>`).join('')}</select><span id="connect-hint">${state.connecting?'请选择目标输入端口':'节点 '+w.document.nodes.length+' · 连线 '+w.document.edges.length}</span></div><span class="note">${state.dirty?'更改后先保存，再运行':'JSON 是工作流的完整配置'}</span></div></section><aside class="workflow-side"><div class="tabs">${[['params','节点参数'],['ai','AI 分析与修改'],['run','执行结果']].map(([v,t])=>`<button data-action="side-tab" data-value="${v}" class="${(state.sideTab||'params')===v?'active':''}">${t}</button>`).join('')}</div><div class="workflow-side-content" ${state.sideTab==='run'?'hidden':''}>${state.sideTab==='ai'?assistForm():n?nodeForm(n):'<p class="note">点击节点编辑参数。</p>'}</div><div id="job-panel" ${state.sideTab==='run'?'':'hidden'}>${w.job?jobPanel(w.job):'<p class="note job-status">尚未运行。保存后点击“手动运行”。错误与产物显示在这里。</p>'}</div></aside></div></div>`;
+  return `<div class="workflow-product" data-req="REQ-005 REQ-006 REQ-007 REQ-008 REQ-009 REQ-010 REQ-011"><div class="wf-heading"><div><a href="#workflow/project/${w.project_id}" class="note">工作流 / ${escape(projectName(w.project_id))}</a>${projectPicker('workflow',w.project_id)}<h2><span id="workflow-name">${escape(w.name)}</span> <span class="note" id="dirty-label" aria-live="polite">${state.dirty?'未保存':'已保存 · r'+w.revision}</span></h2></div><div class="row">${(can?btn('导入 JSON','workflow-import'):'')+btn('查看 JSON','workflow-json')}${btn('导出 JSON','workflow-export')}${btn('版本历史','workflow-versions')}${can?btn('撤销','workflow-undo','','title="撤销 (Ctrl/⌘+Z)" aria-keyshortcuts="Control+Z Meta+Z" '+(state.workflowHistory.canUndo?'':'disabled'))+btn('重做','workflow-redo','','title="重做 (Ctrl/⌘+Shift+Z)" aria-keyshortcuts="Control+Shift+Z Meta+Shift+Z Control+Y" '+(state.workflowHistory.canRedo?'':'disabled'))+btn('保存为模板','template-save')+btn('新建','workflow-new')+btn('AI 修改','workflow-ai')+btn('另存为','workflow-clone')+btn('保存','workflow-save','','','save')+btn('手动运行','workflow-run','primary',w.job&&['running','queued'].includes(w.job.status)?'disabled':'','play'):''}</div></div><div id="workflow-run-summary" class="wf-run-summary">${runSummary(w.job)}</div>${can&&state.contextVersions?.length?`<div class="workflow-context">${projectContext.picker('workflow-context',state.workflowContext?.[w.id])}</div>`:''}<div class="wf-body"><aside class="node-library"><h3>任务节点</h3><p class="note">点击添加到画布</p>${Object.entries(nodeNames).map(([type,name])=>btn(name,'node-add','node-library-item',`data-type="${type}" ${can?'':'disabled'}`,nodeTone[type])).join('')}<div class="node-hint">选择输出端口，再点击目标节点的输入端口连接。拖动节点标题调整位置。</div></aside><section class="canvas-area"><div class="canvas-scroller"><div class="canvas-extent" style="width:${canvasSize().width*state.zoom}px;height:${canvasSize().height*state.zoom}px"><div class="workflow-canvas" id="workflow-canvas" style="transform:scale(${state.zoom})"><svg id="edges" width="${canvasSize().width}" height="${canvasSize().height}" aria-label="节点连线">${edgesSVG()}</svg>${w.document.nodes.map(nodeHTML).join('')}</div></div></div><div class="canvas-footer"><div class="row"><select id="canvas-zoom" aria-label="画布缩放" class="zoom-select">${[.4,.6,.8,1,1.2].map(z=>`<option value="${z}" ${state.zoom===z?'selected':''}>${Math.round(z*100)}%</option>`).join('')}</select><span id="connect-hint">${state.connecting?'请选择目标输入端口':'节点 '+w.document.nodes.length+' · 连线 '+w.document.edges.length}</span></div><span class="note" id="workflow-save-hint">${state.dirty?'更改后先保存，再运行':'JSON 是工作流的完整配置'}</span></div></section><aside class="workflow-side"><div class="tabs">${[['params','节点参数'],['ai','AI 分析与修改'],['run','执行结果']].map(([v,t])=>`<button data-action="side-tab" data-value="${v}" class="${(state.sideTab||'params')===v?'active':''}">${t}</button>`).join('')}</div><div class="workflow-side-content" ${state.sideTab==='run'?'hidden':''}>${state.sideTab==='ai'?assistForm():n?nodeForm(n):'<p class="note">点击节点编辑参数。</p>'}</div><div id="job-panel" ${state.sideTab==='run'?'':'hidden'}>${w.job?jobPanel(w.job):'<p class="note job-status">尚未运行。保存后点击“手动运行”。错误与产物显示在这里。</p>'}</div></aside></div></div>`;
 }
 function canvasSize(){return {width:Math.max(1600,...state.w.document.nodes.map(n=>n.position.x+300)),height:Math.max(1100,...state.w.document.nodes.map(n=>n.position.y+220))};}
 function nodeHTML(n){const s=state.w.job?.steps?.[n.id]?.status;return `<article class="product-node ${state.selected===n.id?'selected':''} ${s||''}" data-node="${n.id}" style="left:${n.position.x}px;top:${n.position.y}px"><header data-drag="${n.id}">${I(nodeTone[n.type])}<strong>${escape(n.label||nodeNames[n.type])}</strong></header><div class="product-node-body"><span class="note">${nodeNames[n.type]}</span><p>${escape(n.params.prompt?.slice(0,65)||state.models.find(m=>m.id===n.params.model_id)?.name||state.assets.find(a=>a.id===n.params.asset_id)?.name||'点击配置')}</p></div><footer>${!['prompt_input','reference_asset'].includes(n.type)?`<button class="port in" data-action="connect-in" data-id="${n.id}" aria-label="${escape(n.label)}输入端口">输入</button>`:'<span></span>'}${n.type!=='media_output'?`<button class="port out" data-action="connect-out" data-id="${n.id}" aria-label="${escape(n.label)}输出端口">输出</button>`:''}</footer></article>`;}
-function edgesSVG(){return state.w.document.edges.map((e,i)=>{const s=state.w.document.nodes.find(n=>n.id===e.source),t=state.w.document.nodes.find(n=>n.id===e.target);if(!s||!t)return '';const x=s.position.x+228,y=s.position.y+133,tx=t.position.x,ty=t.position.y+133;return `<path data-edge="${i}" d="M${x} ${y} C${x+85} ${y},${tx-85} ${ty},${tx} ${ty}"/><circle data-edge="${i}" cx="${(x+tx)/2}" cy="${(y+ty)/2}" r="6"><title>点击删除连线</title></circle>`;}).join('');}
+function edgesSVG(moving){return state.w.document.edges.map((e,i)=>{const s=state.w.document.nodes.find(n=>n.id===e.source),t=state.w.document.nodes.find(n=>n.id===e.target);if(!s||!t)return '';const start=s.id===moving?.id?moving.position:s.position,end=t.id===moving?.id?moving.position:t.position;const x=start.x+228,y=start.y+133,tx=end.x,ty=end.y+133;return `<path data-edge="${i}" d="M${x} ${y} C${x+85} ${y},${tx-85} ${ty},${tx} ${ty}"/><circle data-edge="${i}" cx="${(x+tx)/2}" cy="${(y+ty)/2}" r="6"><title>点击删除连线</title></circle>`;}).join('');}
 function apiOptionFields(kind,prefix,values={},title='API 可选参数'){
   const field=f=>{const name=prefix+f.key,value=values[f.key]??'';if(f.type==='select')return select(f.label,name,[['','不设置'],...f.values.map(v=>[v,v])],value);if(f.type==='number')return input(f.label,name,value,'number',`min="${f.min}" max="${f.max}" step="${f.integer?1:'any'}"`);return area(f.label,name,f.type==='lines'&&Array.isArray(value)?value.join('\n'):value,`rows="2" ${f.maxLength?'maxlength="'+f.maxLength+'"':''}`);};
   const custom=values.api_params??'';
@@ -97,12 +98,131 @@ function teamPage(){return `<div class="page" data-req="REQ-004 REQ-017">${head(
 function skillsPage(){return `<div class="page" data-req="REQ-013 REQ-014 REQ-034">${head('Agent、Skill 与专家','Agent 执行任务；Skill 是单项能力；专家组合多个 Skill，无需设置顺序。',state.user.role==='admin'?btn('扩展 Skill','skill-new')+btn('新建专家','expert-new','primary','','plus'):'')}<h3 class="section-label">内置 Agent</h3><div class="grid3">${state.agents.map(a=>`<article class="card agent-card"><h3>${escape(a.name)}</h3><p>${escape(a.description)}</p>${btn('使用此 Agent 新建对话','agent-chat-new','small',`data-id="${a.id}"`)}</article>`).join('')}</div><h3 class="section-label">专家组合</h3><div class="grid3">${state.experts.map(e=>`<article class="card agent-card"><h3>${escape(e.name)}</h3><p>${e.skill_ids.map(id=>escape(state.skills.find(s=>s.id===id)?.name||id)).join('、')}</p><footer>${badge(e.task==='prompt'?'提示词':e.task==='video'?'视频':e.task==='image'?'图片':'通用')}${state.user.role==='admin'?btn('编辑组合','expert-edit','small',`data-id="${e.id}"`):''}</footer></article>`).join('')}</div><h3 class="section-label">Skill 模板</h3><div class="grid3">${state.skills.map(s=>`<article class="card agent-card"><h3>${escape(s.name)}</h3><p>${escape(s.template)}</p><footer>${badge(s.builtin?'内置':'团队扩展')}${state.user.role==='admin'?btn('编辑','skill-edit','small',`data-id="${s.id}"`):''}</footer></article>`).join('')}</div></div>`;}
 function apiPage(){return `<div class="page" data-req="REQ-021">${head('工作流 API','发布固定版本，外部系统提交提示词并异步获取图片与视频。',editable()?btn('发布工作流','publish-new','primary','','api'):'')}<div class="notice">发布版本保留完整工作流快照。草稿更新不会改变已发布接口；每个版本使用独立凭据。</div><div class="card"><table class="datatable"><thead><tr><th>接口／版本</th><th>来源</th><th>调用路径</th><th>状态</th><th>操作</th></tr></thead><tbody>${state.publications.map(p=>`<tr><td><strong>${escape(p.name)}</strong><small>${escape(p.version)}</small></td><td><a href="#workflow/${p.workflow_id}">${escape(state.workflows.find(w=>w.id===p.workflow_id)?.name||'工作流')}</a></td><td><code>/api/v1/endpoints/${p.id}/runs</code></td><td>${badge(p.enabled?'已发布':'已撤销',p.enabled?'green':'')}</td><td>${btn('使用说明','api-help','small',`data-id="${p.id}"`)}${p.enabled&&(p.owner_id===state.user.id||state.user.role==='admin')?btn('撤销','publish-revoke','small',`data-id="${p.id}"`):''}</td></tr>`).join('')}</tbody></table></div>${!state.publications.length?empty('把已保存的工作流发布成 API。',editable()?btn('发布工作流','publish-new','primary'):''):''}</div>`;}
 let renderGeneration=0,poll=null;
-async function render(){const gen=++renderGeneration;clearTimeout(poll);applyTheme();if(!state.user)return loginPage(state.setup,location.hash.startsWith('#join/')?location.hash.split('/')[1]:null);const parts=location.hash.slice(1).split('/');state.route=names[parts[0]]?parts[0]:'projects';state.workflowView=state.route==='workflow'&&parts[1]==='templates'?'templates':'list';const collectionRoute=['workflow','create'].includes(state.route)&&parts[1]==='project';if(collectionRoute)state.collectionProject[state.route]=parts[2]||'';state.id=collectionRoute||state.workflowView==='templates'?null:parts[1]||null;state.w=null;state.c=null;state.creation=null;try{if(state.route==='studio'&&state.id)state.creation=await api('creations/'+state.id);if(state.route==='workflow'&&state.id){state.w=await api('workflows/'+state.id);if(state.activeWorkflow!==state.w.id){state.analysis='';state.proposal=null;state.activeWorkflow=state.w.id;}state.collectionProject.workflow=state.w.project_id;state.selected=state.w.document.nodes.some(n=>n.id===state.selected)?state.selected:state.w.document.nodes[0]?.id;state.dirty=false;}if(state.route==='create'&&state.id){state.c=await api('chats/'+state.id);state.collectionProject.create=state.c.project_id;restoreChatSettings(state.c);}if(gen!==renderGeneration)return;const contextProject=(state.w||state.c||state.creation)?.project_id;const contextVersions=contextProject?await projectContext.versions(contextProject):[];if(gen!==renderGeneration)return;state.contextVersions=contextVersions;if(state.route==='testing'){const pid=state.id||state.testWorkspace?.project_id;const definitions=await(await fetch('/test-cases.json')).json(),saved=pid?await api('projects/'+pid+'/test-cases'):[];state.manualCases=definitions.map(c=>({...c,entry_path:c.entry_path||saved.find(x=>x.id===c.id)?.entry_path}));}const content=state.route==='projects'?await projectsPage():({studio:()=>studioUI.page(),workflow:workflowPage,create:chatPage,assets:assetsPage,models:modelsPage,team:teamPage,skills:skillsPage,api:apiPage,testing:testingPage}[state.route])();if(gen!==renderGeneration)return;shell(content);bindForms();schedulePoll();}catch(err){if(gen!==renderGeneration)return;if(err.status===401){state.user=null;loginPage(false);}else shell(`<div class="page">${head('内容加载失败',err.message)}<a class="btn" href="#projects">返回项目</a></div>`);}}
-function dirty(){state.dirty=true;$('#dirty-label')?.replaceChildren(document.createTextNode('未保存'));}
+async function render(){const gen=++renderGeneration;clearTimeout(poll);applyTheme();if(!state.user)return loginPage(state.setup,location.hash.startsWith('#join/')?location.hash.split('/')[1]:null);const parts=location.hash.slice(1).split('/');state.route=names[parts[0]]?parts[0]:'projects';state.workflowView=state.route==='workflow'&&parts[1]==='templates'?'templates':'list';const collectionRoute=['workflow','create'].includes(state.route)&&parts[1]==='project';if(collectionRoute)state.collectionProject[state.route]=parts[2]||'';state.id=collectionRoute||state.workflowView==='templates'?null:parts[1]||null;state.w=null;state.c=null;state.creation=null;drag=null;try{if(state.route==='studio'&&state.id)state.creation=await api('creations/'+state.id);if(state.route==='workflow'&&state.id){const workflow=await api('workflows/'+state.id);if(gen!==renderGeneration)return;state.w=workflow;state.workflowHistory=createWorkflowHistory(workflow.document);state.connecting=null;if(state.activeWorkflow!==state.w.id){state.analysis='';state.proposal=null;state.activeWorkflow=state.w.id;}state.collectionProject.workflow=state.w.project_id;state.selected=state.w.document.nodes.some(n=>n.id===state.selected)?state.selected:state.w.document.nodes[0]?.id;state.dirty=false;}if(state.route==='create'&&state.id){state.c=await api('chats/'+state.id);state.collectionProject.create=state.c.project_id;restoreChatSettings(state.c);}if(gen!==renderGeneration)return;const contextProject=(state.w||state.c||state.creation)?.project_id;const contextVersions=contextProject?await projectContext.versions(contextProject):[];if(gen!==renderGeneration)return;state.contextVersions=contextVersions;if(state.route==='testing'){const pid=state.id||state.testWorkspace?.project_id;const definitions=await(await fetch('/test-cases.json')).json(),saved=pid?await api('projects/'+pid+'/test-cases'):[];state.manualCases=definitions.map(c=>({...c,entry_path:c.entry_path||saved.find(x=>x.id===c.id)?.entry_path}));}const content=state.route==='projects'?await projectsPage():({studio:()=>studioUI.page(),workflow:workflowPage,create:chatPage,assets:assetsPage,models:modelsPage,team:teamPage,skills:skillsPage,api:apiPage,testing:testingPage}[state.route])();if(gen!==renderGeneration)return;shell(content);bindForms();schedulePoll();}catch(err){if(gen!==renderGeneration)return;if(err.status===401){state.user=null;loginPage(false);}else shell(`<div class="page">${head('内容加载失败',err.message)}<a class="btn" href="#projects">返回项目</a></div>`);}}
 function drawCanvas(){if(!state.w)return;$('#workflow-canvas').innerHTML=`<svg id="edges" width="${canvasSize().width}" height="${canvasSize().height}" aria-label="节点连线">${edgesSVG()}</svg>`+state.w.document.nodes.map(nodeHTML).join('');const hint=$('#connect-hint');if(hint)hint.textContent=state.connecting?'请选择目标输入端口':'节点 '+state.w.document.nodes.length+' · 连线 '+state.w.document.edges.length;}
-function redrawWorkflow(){shell(workflowPage());bindForms();schedulePoll();}
-async function saveWorkflow(){if(!state.w?.can_edit)return;applyNodeForm();const w=await api('workflows/'+state.w.id,'PUT',{revision:state.w.revision,document:state.w.document});state.w={...state.w,...w};state.dirty=false;await loadCommon();redrawWorkflow();toast('工作流已保存');}
-function applyNodeForm(){const form=$('#node-form');if(!form||!state.w.can_edit)return;const n=state.w.document.nodes.find(n=>n.id===state.selected),vals=Object.fromEntries(new FormData(form));const kind=n.type==='prompt_agent'?'text':n.type==='video_generate'?'video':n.type==='image_generate'?'image':null;const options=kind?readApiOptions(form,kind,'node-'):{};n.label=vals['node-label'];for(const k of ['prompt','model_id','asset_id','size','seed','seconds'])if(vals['node-'+k]!==undefined)n.params[k]=['seconds','seed'].includes(k)&&vals['node-'+k]!==''?Number(vals['node-'+k]):vals['node-'+k];if(vals['node-skill']!==undefined)n.params.skill_ids=vals['node-skill']?[vals['node-skill']]:[];if(kind){for(const f of state.taskOptions[kind]||[])delete n.params[f.key];delete n.params.api_params;Object.assign(n.params,options);}}
+function redrawWorkflow(){
+  const canvas = $('.canvas-scroller');
+  const position = canvas && [canvas.scrollLeft, canvas.scrollTop];
+  shell(workflowPage());
+  bindForms();
+  if (position) $('.canvas-scroller').scrollTo(...position);
+  schedulePoll();
+}
+function nodeFormEdited(form = $('#node-form')) {
+  return !!form && JSON.stringify([...new FormData(form)]) !== form.dataset.initialValues;
+}
+function updateWorkflowStatus() {
+  if (!state.w) return;
+  const pending = nodeFormEdited();
+  state.dirty = state.workflowHistory.dirty || pending;
+  const label = $('#dirty-label');
+  if (label) label.textContent = state.dirty ? '未保存' : '已保存 · r' + state.w.revision;
+  const hint = $('#workflow-save-hint');
+  if (hint) hint.textContent = state.dirty ? '更改后先保存，再运行' : 'JSON 是工作流的完整配置';
+  const undo = $('[data-action="workflow-undo"]');
+  const redo = $('[data-action="workflow-redo"]');
+  if (undo) undo.disabled = !pending && !state.workflowHistory.canUndo;
+  if (redo) redo.disabled = pending || !state.workflowHistory.canRedo;
+}
+function replaceWorkflowDocument(document) {
+  if (!state.workflowHistory.record(document)) return false;
+  state.w.document = document;
+  updateWorkflowStatus();
+  return true;
+}
+function editWorkflow(edit) {
+  const document = structuredClone(state.w.document);
+  edit(document);
+  return replaceWorkflowDocument(document);
+}
+function moveWorkflowHistory(direction) {
+  if (!state.w?.can_edit || drag) return;
+  if (nodeFormEdited()) {
+    if (direction === 'undo') {
+      state.dirty = state.workflowHistory.dirty;
+      redrawWorkflow();
+    }
+    return;
+  }
+  const document = state.workflowHistory[direction]();
+  if (!document) return;
+  state.w.document = document;
+  state.selected = document.nodes.some(n => n.id === state.selected) ? state.selected : document.nodes[0]?.id;
+  state.connecting = null;
+  state.dirty = state.workflowHistory.dirty;
+  redrawWorkflow();
+}
+async function applyWorkflowJson(w, document) {
+  if (!w?.can_edit || state.w !== w) return;
+  await api('workflows/validate', 'POST', {project_id:w.project_id, document});
+  if (state.w !== w) return;
+  replaceWorkflowDocument(document);
+  state.selected = w.document.nodes.some(n => n.id === state.selected) ? state.selected : w.document.nodes[0]?.id;
+  state.connecting = null;
+  redrawWorkflow();
+}
+function acceptWorkflowRevision(w, saved) {
+  if (state.w !== w) return;
+  state.workflowHistory.record(saved.document);
+  Object.assign(w, saved);
+  state.workflowHistory.markSaved(saved.document);
+  state.selected = w.document.nodes.some(n => n.id === state.selected) ? state.selected : w.document.nodes[0]?.id;
+  state.connecting = null;
+  state.dirty = false;
+  redrawWorkflow();
+}
+async function saveWorkflow() {
+  const w = state.w;
+  if (!w?.can_edit || state.savingWorkflow === w || drag) return;
+  if (applyNodeForm()) drawCanvas();
+  state.savingWorkflow = w;
+  try {
+    const saved = await api('workflows/' + w.id, 'PUT', {revision:w.revision, document:w.document});
+    if (state.w !== w) return;
+    const {document, ...metadata} = saved;
+    Object.assign(w, metadata);
+    state.workflowHistory.markSaved(document);
+    updateWorkflowStatus();
+    const heading = $('#workflow-name');
+    if (heading) heading.textContent = w.name;
+    await loadCommon();
+    toast('工作流已保存');
+  } finally {
+    if (state.savingWorkflow === w) state.savingWorkflow = null;
+  }
+}
+function applyNodeForm() {
+  const form = $('#node-form');
+  if (!state.w?.can_edit || !nodeFormEdited(form)) return;
+  if (!form.reportValidity()) throw Error('请检查节点参数');
+  const values = Object.fromEntries(new FormData(form));
+  const initial = Object.fromEntries(JSON.parse(form.dataset.initialValues));
+  const changed = key => values['node-' + key] !== initial['node-' + key];
+  const applied = editWorkflow(document => {
+    const node = document.nodes.find(n => n.id === state.selected);
+    const kind = {prompt_agent:'text', image_generate:'image', video_generate:'video'}[node.type];
+    if (changed('label')) node.label = values['node-label'];
+    for (const key of ['prompt','model_id','asset_id','size','seed','seconds']) {
+      if (!changed(key)) continue;
+      const value = values['node-' + key];
+      node.params[key] = ['seconds','seed'].includes(key) && value !== '' ? Number(value) : value;
+    }
+    if (changed('skill')) node.params.skill_ids = values['node-skill'] ? [values['node-skill']] : [];
+    if (kind) {
+      const options = [...(state.taskOptions[kind] || []).map(field => field.key), 'api_params'];
+      if (options.some(changed)) {
+        const parsed = readApiOptions(form, kind, 'node-');
+        for (const key of options.filter(changed)) {
+          if (key in parsed) node.params[key] = parsed[key];
+          else delete node.params[key];
+        }
+      }
+    }
+  });
+  form.dataset.initialValues = JSON.stringify([...new FormData(form)]);
+  updateWorkflowStatus();
+  return applied;
+}
 function bindForms(){
   modelUI.bind();studioUI.bind();
   const send=$('#chat-form button[type="submit"]');if(send&&state.c){const busy=state.c.job&&['queued','running'].includes(state.c.job.status);send.disabled=!state.c.can_edit||busy;send.textContent=busy?'生成中…':state.chatAgent==='prompt'?'发送并整理':'发送并生成';}
@@ -113,8 +233,19 @@ function bindForms(){
   document.querySelectorAll('[data-template-project]').forEach(el=>el.onchange=e=>{state.collectionProject.workflow=e.target.value;render();});
   if($('#workflow-context'))$('#workflow-context').onchange=e=>{(state.workflowContext??={})[state.w.id]=e.target.value;};
   if($('#project-filter'))$('#project-filter').onchange=e=>goto('projects',e.target.value);
-  if($('#node-form'))$('#node-form').onsubmit=e=>{e.preventDefault();if(state.w.can_edit){try{applyNodeForm();e.target.querySelector('.form-error').textContent='';dirty();drawCanvas();toast('参数已应用，请保存工作流');}catch(err){e.target.querySelector('.form-error').textContent=err.message;}}};
-  if($('#assist-form'))$('#assist-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{if(state.dirty)throw Error('请先保存当前修改，再使用 AI 助手');const values=Object.fromEntries(new FormData(e.target));state.assistDraft={workflow_id:state.w.id,mode:values['assist-mode'],model_id:values['assist-model'],prompt:values['assist-prompt'],params:readApiOptions(e.target,'text','assist-'),...(values['assist-context']?{context_revision:Number(values['assist-context'])}:{})};const {workflow_id,...request}=state.assistDraft;const result=await api('workflows/'+workflow_id+'/assist','POST',request);if(result.analysis){state.analysis=result.analysis;redrawWorkflow();}else{state.proposal=result;showProposal();}}catch(err){const error=e.target.querySelector('.form-error');error.textContent=err.message;if(/模型 HTTP (502|503|504)/.test(err.message)){error.append(document.createElement('br'),document.createTextNode('本次未生成分析结果或修改提案，工作流未被本次请求更改。请先在模型配置中验证生成，成功后再手动重试。'));const link=document.createElement('a');link.href='#models';link.textContent='打开模型配置 →';error.append(document.createElement('br'),link);}}finally{b.disabled=false;}};
+  const nodeForm = $('#node-form');
+  if (nodeForm) {
+    nodeForm.dataset.initialValues ??= JSON.stringify([...new FormData(nodeForm)]);
+    nodeForm.onsubmit = e => {
+      e.preventDefault();
+      try {
+        applyNodeForm();
+        nodeForm.querySelector('.form-error').textContent = '';
+        drawCanvas();
+      } catch (err) { nodeForm.querySelector('.form-error').textContent = err.message; }
+    };
+  }
+  if($('#assist-form'))$('#assist-form').onsubmit=async e=>{e.preventDefault();const b=e.submitter;b.disabled=true;try{if(state.dirty)throw Error('请先保存当前修改，再使用 AI 助手');const values=Object.fromEntries(new FormData(e.target));state.assistDraft={workflow_id:state.w.id,mode:values['assist-mode'],model_id:values['assist-model'],prompt:values['assist-prompt'],params:readApiOptions(e.target,'text','assist-'),...(values['assist-context']?{context_revision:Number(values['assist-context'])}:{})};const {workflow_id,...request}=state.assistDraft;const result=await api('workflows/'+workflow_id+'/assist','POST',request);if(state.w?.id!==workflow_id)return;if(result.analysis){state.analysis=result.analysis;redrawWorkflow();}else{state.proposal=result;showProposal();}}catch(err){const error=e.target.querySelector('.form-error');error.textContent=err.message;if(/模型 HTTP (502|503|504)/.test(err.message)){error.append(document.createElement('br'),document.createTextNode('本次未生成分析结果或修改提案，工作流未被本次请求更改。请先在模型配置中验证生成，成功后再手动重试。'));const link=document.createElement('a');link.href='#models';link.textContent='打开模型配置 →';error.append(document.createElement('br'),link);}}finally{b.disabled=false;}};
   if($('#chat-agent'))$('#chat-agent').onchange=e=>{const next=e.target.value;captureChatSettings();state.chatAgent=next;restoreAgentDraft();$('#chat-settings').innerHTML=chatSettings();if($('#chat-output-hint'))$('#chat-output-hint').textContent=next==='prompt'?'返回文字提示词':'生成结果加入项目与资产库';bindForms();};
   if($('#chat-expert'))$('#chat-expert').onchange=()=>{captureChatSettings();$('#chat-settings').innerHTML=chatSettings();bindForms();};
   if($('#chat-text-model'))$('#chat-text-model').onchange=()=>{captureChatSettings();$('#chat-settings').innerHTML=chatSettings();bindForms();};
@@ -126,10 +257,10 @@ function captureChatSettings(){for(const [k,sel]of [['chatModel','#chat-model'],
 function restoreAgentDraft(){const a=state.chatAgent||'image';Object.assign(state,{chatModel:'',chatContext:'',chatTextModel:'',chatAsset:'',chatExpert:'',chatKind:'image',chatSize:a==='video'?'1280x720':'1024x1024',chatSeconds:4,chatSeed:'',chatSkills:[],chatOptionsDraft:{},chatTextOptionsDraft:{}},state.chatConfigs[(state.c?.id||'new')+'/'+a]||{});}
 function restoreChatSettings(c){if(state.activeChat===c.id)return;state.activeChat=c.id;const last=[...c.messages].reverse().find(m=>m.config)?.config;const hint=state.nextChatAgent||Object.entries(state.testWorkspace?.chats||{}).find(([,cid])=>cid===c.id)?.[0];state.chatAgent=last?.agent||hint||'image';state.nextChatAgent=null;if(last&&!state.chatConfigs[c.id+'/'+state.chatAgent])state.chatConfigs[c.id+'/'+state.chatAgent]={chatModel:last.model_id,chatContext:last.context_revision?String(last.context_revision):'',chatTextModel:last.text_model_id||'',chatAsset:last.asset_ids?.[0]||'',chatExpert:last.expert_id||'',chatKind:last.kind,chatSkills:last.additional_skill_ids||last.skill_ids||[],chatSize:last.size,chatSeconds:last.seconds,chatSeed:last.seed??'',chatOptionsDraft:last,chatTextOptionsDraft:last.text_options||{}};restoreAgentDraft();}
 function runSummary(j){return j?`<strong>当前任务：${statusName[j.status]}</strong>${j.error?`<span class="form-error">${escape(j.error)}</span>`:''}${btn('查看执行结果','workflow-results','small')}`:'<span>尚未运行。AI 确认只保存修改；运行由“手动运行”按钮触发。</span>';}
-function schedulePoll(){clearTimeout(poll);const source=state.w||state.c;if(!source?.job||!['queued','running'].includes(source.job.status))return;const route=state.route,sourceId=source.id;poll=setTimeout(async()=>{try{const j=await api('jobs/'+source.job.id);if(state.route!==route||(state.w||state.c)?.id!==sourceId)return;source.job=j;state.assets=await api('assets');if(route==='workflow'){$('#job-panel').innerHTML=jobPanel(j);$('#workflow-run-summary').innerHTML=runSummary(j);drawCanvas();const run=$('[data-action="workflow-run"]');if(run)run.disabled=['running','queued'].includes(j.status);}else{const updated=await api('chats/'+sourceId);Object.assign(state.c,updated);$('#chat-feed').innerHTML=chatFeed(state.c);const b=$('#chat-form button[type="submit"]');if(b){b.disabled=!state.c.can_edit||['running','queued'].includes(j.status);b.textContent=['running','queued'].includes(j.status)?'生成中…':state.chatAgent==='prompt'?'发送并整理':'发送并生成';}}schedulePoll();}catch(err){toast(err.message);}},1500);}
-function showProposal(){const p=state.proposal;modal('确认这一批工作流修改',`<p>${escape(p.explanation)}</p><p class="note">确认只保存修改；运行仍由工作流上的按钮触发。</p><div class="diff"><div><h3>修改前</h3><pre>${escape(JSON.stringify(p.before,null,2))}</pre></div><div><h3>修改后</h3><pre>${escape(JSON.stringify(p.after,null,2))}</pre></div></div>`,async()=>{await api('proposals/'+p.id+'/confirm','POST',{});state.proposal=null;await loadCommon();await render();toast('修改已保存，尚未运行');},'确认修改');}
+function schedulePoll(){clearTimeout(poll);const source=state.w||state.c;if(!source?.job||!['queued','running'].includes(source.job.status))return;const route=state.route,sourceId=source.id;poll=setTimeout(async()=>{try{const j=await api('jobs/'+source.job.id);if(state.route!==route||(state.w||state.c)?.id!==sourceId)return;source.job=j;state.assets=await api('assets');if(route==='workflow'){if(state.w!==source)return;$('#job-panel').innerHTML=jobPanel(j);$('#workflow-run-summary').innerHTML=runSummary(j);if(!drag)drawCanvas();const run=$('[data-action="workflow-run"]');if(run)run.disabled=['running','queued'].includes(j.status);}else{const updated=await api('chats/'+sourceId);Object.assign(state.c,updated);$('#chat-feed').innerHTML=chatFeed(state.c);const b=$('#chat-form button[type="submit"]');if(b){b.disabled=!state.c.can_edit||['running','queued'].includes(j.status);b.textContent=['running','queued'].includes(j.status)?'生成中…':state.chatAgent==='prompt'?'发送并整理':'发送并生成';}}schedulePoll();}catch(err){toast(err.message);}},1500);}
+function showProposal(){const p=state.proposal,w=state.w;modal('确认这一批工作流修改',`<p>${escape(p.explanation)}</p><p class="note">确认只保存修改；运行仍由工作流上的按钮触发。</p><div class="diff"><div><h3>修改前</h3><pre>${escape(JSON.stringify(p.before,null,2))}</pre></div><div><h3>修改后</h3><pre>${escape(JSON.stringify(p.after,null,2))}</pre></div></div>`,async()=>{if(state.w!==w||state.dirty||state.savingWorkflow===w)throw Error('请先保存当前画布，再重新生成提案');const saved=await api('proposals/'+p.id+'/confirm','POST',{});if(state.w===w)state.proposal=null;acceptWorkflowRevision(w,saved);await loadCommon();toast('修改已保存，尚未运行');},'确认修改');}
 function newContent(source,document=null,projectId=''){const contextProject=projectId||state.w?.project_id||state.c?.project_id||(state.route==='projects'?state.id:state.collectionProject[source==='workflow'?'workflow':'create']);const projects=optionsProjects(),fresh=projects.length===0;modal(source==='workflow'?'新建工作流':'新建对话',select('所属项目','project_id',[...projects,['__new__','同时新建项目']],fresh?'__new__':projects.some(p=>p[0]===contextProject)?contextProject:projects[0][0])+`<div id="new-project-field" ${fresh?'':'hidden'}>${input('新项目名称','new_project_name','我的创作项目')}</div>`+input('名称','name',document?.name||'','text','required'),async b=>{let pid=b.project_id;if(pid==='__new__')pid=(await api('projects','POST',{name:b.new_project_name,visibility:'team'})).id;const c=await api(source==='workflow'?'workflows':'chats','POST',{project_id:pid,...(source==='workflow'?{name:b.name,...(document?{document:{...document,name:b.name}}:{})}:{title:b.name})});await loadCommon();goto(source==='workflow'?'workflow':'create',c.id);});$('#project_id').onchange=e=>$('#new-project-field').hidden=e.target.value!=='__new__';}
-function importWorkflow(asNew=false){modal(asNew?'从 JSON 新建工作流':'导入工作流 JSON',`<p>选择 JSON 文件，或粘贴完整配置。</p><input type="file" id="workflow-file" accept="application/json,.json">${area('完整配置','workflow-json',asNew?'':JSON.stringify(state.w.document,null,2),'rows="15" spellcheck="false"')}<p class="note">导入不执行任务。模型与资产编号须属于本团队。</p>`,async b=>{let doc;try{doc=JSON.parse(b['workflow-json']);}catch{throw Error('JSON 格式有误');}if(asNew){if(doc.schema_version!=='1.0'||!Array.isArray(doc.nodes))throw Error('请选择有效工作流 JSON');setTimeout(()=>newContent('workflow',doc),0);}else{await api('workflows/validate','POST',{project_id:state.w.project_id,document:doc});state.w.document=doc;dirty();redrawWorkflow();}},asNew?'下一步：选择项目':'应用到画布');}
+function importWorkflow(asNew=false){const w=state.w;if(!asNew)applyNodeForm();modal(asNew?'从 JSON 新建工作流':'导入工作流 JSON',`<p>选择 JSON 文件，或粘贴完整配置。</p><input type="file" id="workflow-file" accept="application/json,.json">${area('完整配置','workflow-json',asNew?'':JSON.stringify(state.w.document,null,2),'rows="15" spellcheck="false"')}<p class="note">导入不执行任务。模型与资产编号须属于本团队。</p>`,async b=>{let doc;try{doc=JSON.parse(b['workflow-json']);}catch{throw Error('JSON 格式有误');}if(asNew){if(doc.schema_version!=='1.0'||!Array.isArray(doc.nodes))throw Error('请选择有效工作流 JSON');setTimeout(()=>newContent('workflow',doc),0);}else await applyWorkflowJson(w,doc);},asNew?'下一步：选择项目':'应用到画布');}
 function projectShare(pid){const p=state.projects.find(p=>p.id===pid),can=state.user.role==='admin'||p.owner_id===state.user.id;modal('项目共享 · '+p.name,input('项目名称','name',p.name)+select('访问范围','visibility',[['team','团队共享'],['private','仅创建者与指定成员']],p.visibility)+`<div class="form-field"><label>指定成员权限</label>${state.users.filter(u=>u.id!==p.owner_id).map(u=>select(escape(u.name)+' · '+roleName[u.role],'acl_'+u.id,[['','未授权'],['read','查看'],['edit','编辑']],p.acl[u.id]||'')).join('')}</div><p class="note">查看者的团队角色限制优先；授予编辑权限仍只能查看。项目中的资产继承项目权限。</p>`,can?async b=>{const acl={};for(const [k,v]of Object.entries(b))if(k.startsWith('acl_')&&v)acl[k.slice(4)]=v;await api('projects/'+pid,'PATCH',{name:b.name,visibility:b.visibility,acl});await loadCommon();await render();}:null,can?'保存':'关闭');}
 function modelModal(mid){return modelUI.edit(mid);}
 async function fileData(file){if(!file)throw Error('请选择文件');if(file.size>20*1024*1024)throw Error('上传上限为 20 MB');return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result.split(',')[1]);r.onerror=reject;r.readAsDataURL(file);});}
@@ -181,25 +312,134 @@ document.addEventListener('click',async e=>{
     if(a==='api-help')return apiHelp(x);
     if(a==='publish-revoke')return modal('撤销 API',`<p>撤销后，${escape(state.publications.find(p=>p.id===x).name)} 的调用凭据立即失效。</p>`,async()=>{await api('publications/'+x,'PATCH',{});await loadCommon();await render();},'撤销');
     if(a==='side-tab'){applyNodeForm();state.sideTab=button.dataset.value;return redrawWorkflow();}
+    if(a==='workflow-undo'||a==='workflow-redo')return moveWorkflowHistory(a.slice('workflow-'.length));
     if(a==='workflow-save')return await saveWorkflow();
-    if(a==='workflow-run'){if(state.dirty)return toast('请先保存当前工作流');button.disabled=true;try{state.w.job=await api('workflows/'+state.w.id+'/run','POST',{revision:state.w.revision,...($('#workflow-context')?.value?{context_revision:Number($('#workflow-context').value)}:{})});state.sideTab='run';redrawWorkflow();}finally{button.disabled=false;}return;}
-    if(a==='workflow-json'){applyNodeForm();return modal('工作流 JSON',area('完整配置','workflow-json',JSON.stringify(state.w.document,null,2),'rows="20" spellcheck="false"')+`<input type="file" id="workflow-file" accept="application/json,.json"><p class="note">导入或手动修改后应用到画布，再保存；应用不运行工作流。</p>`,state.w.can_edit?async b=>{let w;try{w=JSON.parse(b['workflow-json']);}catch{throw Error('JSON 格式有误');}await api('workflows/validate','POST',{project_id:state.w.project_id,document:w});state.w.document=w;dirty();redrawWorkflow();}:null,'应用到画布');}
+    if(a==='workflow-run'){if(state.savingWorkflow===state.w||state.dirty)return toast('请先保存当前工作流');button.disabled=true;try{state.w.job=await api('workflows/'+state.w.id+'/run','POST',{revision:state.w.revision,...($('#workflow-context')?.value?{context_revision:Number($('#workflow-context').value)}:{})});state.sideTab='run';redrawWorkflow();}finally{button.disabled=false;}return;}
+    if(a==='workflow-json'){applyNodeForm();const workflow=state.w;return modal('工作流 JSON',area('完整配置','workflow-json',JSON.stringify(state.w.document,null,2),'rows="20" spellcheck="false"')+`<input type="file" id="workflow-file" accept="application/json,.json"><p class="note">导入或手动修改后应用到画布，再保存；应用不运行工作流。</p>`,state.w.can_edit?async b=>{let w;try{w=JSON.parse(b['workflow-json']);}catch{throw Error('JSON 格式有误');}await applyWorkflowJson(workflow,w);}:null,'应用到画布');}
     if(a==='workflow-export'){applyNodeForm();const blob=new Blob([JSON.stringify(state.w.document,null,2)],{type:'application/json'}),u=URL.createObjectURL(blob),link=document.createElement('a');link.href=u;link.download=state.w.name+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(u),1000);return;}
     if(a==='workflow-clone')return modal('另存为工作流',input('名称','name',state.w.name+' · 副本','text','required')+select('所属项目','project_id',optionsProjects(),state.w.project_id),async b=>{const w=await api('workflows','POST',{...b,document:{...state.w.document,name:b.name}});await loadCommon();goto('workflow',w.id);});
-    if(a==='node-add'){if(!state.w.can_edit)return;applyNodeForm();const type=button.dataset.type,nid=type+'_'+crypto.randomUUID().slice(0,8);state.w.document.nodes.push({id:nid,type,label:nodeNames[type],params:{},position:{x:40+Math.max(0,state.w.document.nodes.length-3)%2*290,y:310+Math.floor(Math.max(0,state.w.document.nodes.length-3)/2)*190}});state.selected=nid;state.sideTab='params';dirty();redrawWorkflow();document.querySelector('[data-node="'+nid+'"]').scrollIntoView({block:'nearest',inline:'nearest'});return;}
-    if(a==='node-remove'){if(!state.w.can_edit)return;state.w.document.nodes=state.w.document.nodes.filter(n=>n.id!==x);state.w.document.edges=state.w.document.edges.filter(e=>e.source!==x&&e.target!==x);state.selected=state.w.document.nodes[0]?.id;dirty();return redrawWorkflow();}
-    if(a==='edge-remove'){if(!state.w.can_edit)return;state.w.document.edges.splice(Number(button.dataset.index),1);dirty();return redrawWorkflow();}
+    if(a==='node-add'){
+      if(!state.w.can_edit)return;
+      applyNodeForm();
+      const type=button.dataset.type,nid=type+'_'+crypto.randomUUID().slice(0,8);
+      editWorkflow(document=>{
+        const offset=Math.max(0,document.nodes.length-3);
+        document.nodes.push({id:nid,type,label:nodeNames[type],params:{},position:{x:40+offset%2*290,y:310+Math.floor(offset/2)*190}});
+      });
+      state.selected=nid;
+      state.sideTab='params';
+      redrawWorkflow();
+      document.querySelector('[data-node="'+nid+'"]').scrollIntoView({block:'nearest',inline:'nearest'});
+      return;
+    }
+    if(a==='node-remove'){
+      if(!state.w.can_edit)return;
+      applyNodeForm();
+      editWorkflow(document=>{
+        document.nodes=document.nodes.filter(n=>n.id!==x);
+        document.edges=document.edges.filter(e=>e.source!==x&&e.target!==x);
+      });
+      state.selected=state.w.document.nodes[0]?.id;
+      state.connecting=null;
+      return redrawWorkflow();
+    }
+    if(a==='edge-remove'){
+      if(!state.w.can_edit)return;
+      applyNodeForm();
+      editWorkflow(document=>document.edges.splice(Number(button.dataset.index),1));
+      return redrawWorkflow();
+    }
     if(a==='connect-out'){if(!state.w.can_edit)return;state.connecting=x;return drawCanvas();}
-    if(a==='connect-in'){if(!state.w.can_edit)return;if(!state.connecting)return toast('请先选择输出端口');const edge={source:state.connecting,target:x};if(edge.source===x)return toast('节点不能连接自身');if(!state.w.document.edges.some(e=>e.source===edge.source&&e.target===edge.target)){state.w.document.edges.push(edge);dirty();}state.connecting=null;return drawCanvas();}
+    if(a==='connect-in'){
+      if(!state.w.can_edit)return;
+      if(!state.connecting)return toast('请先选择输出端口');
+      const edge={source:state.connecting,target:x};
+      if(edge.source===x)return toast('节点不能连接自身');
+      applyNodeForm();
+      editWorkflow(document=>{
+        if(!document.edges.some(e=>e.source===edge.source&&e.target===edge.target))document.edges.push(edge);
+      });
+      state.connecting=null;
+      return redrawWorkflow();
+    }
   }catch(err){toast(err.message);}
 });
 document.addEventListener('change',async e=>{if(e.target.id==='workflow-file'){try{$('#workflow-json').value=await e.target.files[0].text();}catch(err){toast(err.message);}}});
-document.addEventListener('click',e=>{if(e.target.closest('[data-action]'))return;const edge=e.target.closest('[data-edge]');if(edge&&state.w?.can_edit){state.w.document.edges.splice(Number(edge.dataset.edge),1);dirty();return drawCanvas();}const node=e.target.closest('[data-node]');if(node){applyNodeForm();state.selected=node.dataset.node;state.sideTab='params';redrawWorkflow();}});
-let drag=null;
-document.addEventListener('pointerdown',e=>{const el=e.target.closest('[data-drag]');if(!el||!state.w?.can_edit||e.button!==0)return;e.preventDefault();const n=state.w.document.nodes.find(n=>n.id===el.dataset.drag);drag={node:n,x:e.clientX,y:e.clientY,left:n.position.x,top:n.position.y,element:el.closest('[data-node]'),moved:false};el.setPointerCapture(e.pointerId);});
-document.addEventListener('pointermove',e=>{if(!drag)return;const dx=(e.clientX-drag.x)/state.zoom,dy=(e.clientY-drag.y)/state.zoom;if(Math.abs(dx)+Math.abs(dy)<4)return;drag.moved=true;drag.node.position={x:Math.round(Math.max(0,Math.min(1350,drag.left+dx))),y:Math.round(Math.max(0,Math.min(930,drag.top+dy)))};drag.element.style.left=drag.node.position.x+'px';drag.element.style.top=drag.node.position.y+'px';$('#edges').innerHTML=edgesSVG();});
-document.addEventListener('pointerup',()=>{if(drag?.moved)dirty();drag=null;});
-document.addEventListener('input',e=>{if(e.target.closest('#node-form'))dirty();});
+document.addEventListener('click', e => {
+  if (e.target.closest('[data-action]') || !state.w) return;
+  try {
+    const edge = e.target.closest('[data-edge]');
+    if (edge && state.w.can_edit) {
+      applyNodeForm();
+      editWorkflow(document => document.edges.splice(Number(edge.dataset.edge), 1));
+      return redrawWorkflow();
+    }
+    const node = e.target.closest('[data-node]');
+    if (node) {
+      applyNodeForm();
+      state.selected = node.dataset.node;
+      state.sideTab = 'params';
+      redrawWorkflow();
+    }
+  } catch (err) { toast(err.message); }
+});
+let drag = null;
+document.addEventListener('pointerdown', e => {
+  const header = e.target.closest('[data-drag]');
+  if (!header || !state.w?.can_edit || e.button !== 0 || drag) return;
+  try { applyNodeForm(); } catch (err) { toast(err.message); return; }
+  e.preventDefault();
+  const node = state.w.document.nodes.find(n => n.id === header.dataset.drag);
+  drag = {
+    workflow:state.w, pointer:e.pointerId, id:node.id, x:e.clientX, y:e.clientY,
+    start:node.position, position:node.position, element:header.closest('[data-node]'), moved:false,
+  };
+  header.setPointerCapture(e.pointerId);
+});
+document.addEventListener('pointermove', e => {
+  if (!drag || drag.pointer !== e.pointerId || state.w !== drag.workflow) return;
+  const dx = (e.clientX - drag.x) / state.zoom;
+  const dy = (e.clientY - drag.y) / state.zoom;
+  if (!drag.moved && Math.abs(dx) + Math.abs(dy) < 4) return;
+  drag.moved = true;
+  drag.position = {
+    x:Math.round(Math.max(0, Math.min(1350, drag.start.x + dx))),
+    y:Math.round(Math.max(0, Math.min(930, drag.start.y + dy))),
+  };
+  drag.element.style.left = drag.position.x + 'px';
+  drag.element.style.top = drag.position.y + 'px';
+  $('#edges').innerHTML = edgesSVG(drag);
+});
+function finishNodeDrag(e) {
+  if (!drag || e.pointerId !== drag.pointer) return;
+  const gesture = drag;
+  drag = null;
+  if (!gesture.moved || state.w !== gesture.workflow) return;
+  if (e.type === 'pointerup') {
+    editWorkflow(document => {
+      const node = document.nodes.find(n => n.id === gesture.id);
+      if (node) node.position = gesture.position;
+    });
+  }
+  drawCanvas();
+}
+document.addEventListener('pointerup', finishNodeDrag);
+document.addEventListener('pointercancel', finishNodeDrag);
+document.addEventListener('lostpointercapture', finishNodeDrag);
+document.addEventListener('input', e => {
+  if (e.target.closest('#node-form')) updateWorkflowStatus();
+});
+document.addEventListener('change', e => {
+  if (e.target.closest('#node-form')) updateWorkflowStatus();
+});
+document.addEventListener('keydown', e => {
+  if (!state.w?.can_edit || $('#dialog').open || drag) return;
+  const direction = workflowHistoryShortcut(e);
+  if (direction) {
+    e.preventDefault();
+    moveWorkflowHistory(direction);
+  }
+});
 window.addEventListener('hashchange',async()=>{if($('#dialog').open)$('#dialog').close();state.analysis='';state.connecting=null;try{if(state.user)await loadCommon();await render();}catch(err){toast(err.message);}});
 async function init(){applyTheme();try{const b=await api('bootstrap');state.setup=b.setup_required;state.team=b.team;try{const me=await api('me');state.user=me.user;state.team=me.team;await loadCommon();}catch(err){if(err.status!==401)throw err;}await render();}catch(err){$('#app').innerHTML=`<div class="page">${head('服务连接失败',err.message)}${btn('重新加载','reload')}</div>`;}}
 document.addEventListener('click',e=>{if(e.target.closest('[data-action="reload"]'))location.reload();});
@@ -245,6 +485,6 @@ async function versionPreview(revision){
   const w=state.w;if(!w||state.dirty)return toast('请先保存当前修改');
   const v=await api('workflows/'+w.id+'/versions/'+revision);if(state.w?.id!==w.id)return;
   const canRestore=w.can_edit&&v.revision!==w.revision;
-  modal('对比历史版本 r'+revision,`<p>当前保存版 r${w.revision} 与历史 r${revision}。</p><p class="note">${canRestore?'确认后生成新版本，保留现有历史；发布的 API 不变，任务不会自动运行。':'此处仅查看 JSON。'} </p><div class="diff version-diff"><div><h3>当前 r${w.revision}</h3><pre>${escape(JSON.stringify(w.document,null,2))}</pre></div><div><h3>历史 r${revision}</h3><pre>${escape(JSON.stringify(v.document,null,2))}</pre></div></div>`,canRestore?async()=>{const restored=await api('workflows/'+w.id+'/restore','POST',{revision:w.revision,source_revision:v.revision});state.w={...w,...restored};state.dirty=false;await loadCommon();redrawWorkflow();toast('已恢复为 r'+restored.revision+'，尚未运行');}:null,canRestore?'恢复为新版本':'关闭');
+  modal('对比历史版本 r'+revision,`<p>当前保存版 r${w.revision} 与历史 r${revision}。</p><p class="note">${canRestore?'确认后生成新版本，保留现有历史；发布的 API 不变，任务不会自动运行。':'此处仅查看 JSON。'} </p><div class="diff version-diff"><div><h3>当前 r${w.revision}</h3><pre>${escape(JSON.stringify(w.document,null,2))}</pre></div><div><h3>历史 r${revision}</h3><pre>${escape(JSON.stringify(v.document,null,2))}</pre></div></div>`,canRestore?async()=>{if(state.w!==w||state.dirty||state.savingWorkflow===w)throw Error('请先保存当前画布，再恢复历史');const restored=await api('workflows/'+w.id+'/restore','POST',{revision:w.revision,source_revision:v.revision});acceptWorkflowRevision(w,restored);await loadCommon();toast('已恢复为 r'+restored.revision+'，尚未运行');}:null,canRestore?'恢复为新版本':'关闭');
 }
 document.addEventListener('click',e=>{if(e.target.closest('[data-action="templates-back"]')){location.hash='#workflow/project/'+(state.collectionProject.workflow||'');}});
