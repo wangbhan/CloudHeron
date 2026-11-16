@@ -31,11 +31,12 @@ def create_app(settings:Settings|None=None):
     settings=settings or Settings()
     @asynccontextmanager
     async def lifespan(app):
+        vault = Vault(settings.vault_key_b64)
         database=Database(settings.database_url);owner=None;ctx=None
         try:
             database.migrate();owner=psycopg.connect(settings.database_url,autocommit=True)
             if not owner.execute('SELECT pg_try_advisory_lock(91401702)').fetchone()[0]: raise RuntimeError('该 PostgreSQL 数据库已有云鹭执行器，请使用单进程启动')
-            storage=Storage(settings);storage.check();ctx=SimpleNamespace(settings=settings,database=database,storage=storage,vault=Vault(settings.vault_key_b64),owner=owner,closing=False)
+            storage=Storage(settings);storage.check();ctx=SimpleNamespace(settings=settings,database=database,storage=storage,vault=vault,owner=owner,closing=False)
             ctx.worker=Worker(ctx);app.state.ctx=ctx
             with database.connection() as conn: seed(DB(conn))
             ctx.worker.start();yield

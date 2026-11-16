@@ -10,6 +10,13 @@ def test_password_and_vault():
     value='fixture-password-123';encoded=password(value);assert verify(value,encoded);assert not verify('wrong',encoded)
     vault=Vault(base64.b64encode(b'k'*32).decode());secret=vault.encrypt('fixture-model-secret');assert vault.decrypt(secret)=='fixture-model-secret';assert vault.decrypt('')==''
 
+@pytest.mark.parametrize('key', ['REPLACE_VAULT_KEY', base64.b64encode(b'k' * 31).decode()])
+def test_vault_reports_invalid_configuration_without_the_value(key):
+    with pytest.raises(ValueError, match='VAULT_KEY_B64 须为 32 字节') as error:
+        Vault(key)
+    assert key not in str(error.value)
+
+
 @pytest.mark.parametrize('kind',list(OPTIONS))
 def test_options_zero_hidden_and_nested(kind):
     zero={'image':'guidance_scale','video':'guidance_scale','text':'temperature'}[kind]

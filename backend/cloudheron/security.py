@@ -1,4 +1,4 @@
-import base64, hashlib, hmac, secrets
+import base64, binascii, hashlib, hmac, secrets
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from fastapi import HTTPException
 
@@ -26,8 +26,13 @@ def verify(value,encoded):
     except (ValueError,TypeError): return False
 class Vault:
     def __init__(self,key):
-        self.key=base64.b64decode(key,validate=True)
-        if len(self.key)!=32: raise ValueError('VAULT_KEY_B64 须为持久保存的 32 字节密钥')
+        message = 'VAULT_KEY_B64 须为 32 字节密钥的 Base64 编码'
+        try:
+            self.key = base64.b64decode(key, validate=True)
+        except (binascii.Error, ValueError):
+            raise ValueError(message) from None
+        if len(self.key) != 32:
+            raise ValueError(message)
     def encrypt(self,value):
         if not value: return ''
         iv=secrets.token_bytes(12);out=AESGCM(self.key).encrypt(iv,value.encode(),None)

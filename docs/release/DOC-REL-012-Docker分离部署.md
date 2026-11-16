@@ -40,6 +40,12 @@ fi
 
 启停时使用相同的配置与 Compose 项目名。默认读取仓库根目录的 `.env.docker`，项目名为 `cloudheron`。可通过 `CLOUDHERON_DOCKER_ENV_FILE` 指定配置文件，通过 `COMPOSE_PROJECT_NAME` 指定项目名。已有部署应沿用原项目名，以挂载原数据卷。
 
+### API 报 unhealthy
+
+先运行 `./deploy/compose.sh logs --tail=80 api`。如果日志显示 `VAULT_KEY_B64` 或 `Only base64 data is allowed`，检查 Docker 配置中的 Vault 密钥。启动脚本会在启动依赖前检查实际传给 API 的值。仅复制模板会保留占位符。空库按本节上方命令生成密钥。已有加密模型密钥的部署应从备份恢复原 Vault 密钥。配置修正后执行 `./deploy/start.sh`。
+
+2026-11-16 实测模板占位符可被启动前检查识别。修复后，原 Compose 项目复用 PostgreSQL 与对象存储卷，前端首页和 `/api/ready` 均通过验证。
+
 ## 独立管理 PostgreSQL
 
 启动数据库而不启动应用。
