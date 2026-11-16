@@ -33,19 +33,43 @@ def test_background_start_duplicate_restart_preserves_login_and_stops(tmp_path):
             time.sleep(.2)
         else:raise AssertionError('后台API未恢复')
         assert recovered['pid']==first['pid'];assert recovered['restarts']>=1
-        stop = subprocess.run(
-            [str(ROOT / 'stop.sh'), '--json'],
-            env={**env, 'CLOUDHERON_PYTHON': sys.executable},
-            cwd=tmp_path,
-            capture_output=True,
-            text=True,
-            timeout=40,
-        )
+        def stop_from_another_directory():
+            return subprocess.run(
+                [str(ROOT / 'stop.sh'), '--json'],
+                env={**env, 'CLOUDHERON_PYTHON': sys.executable},
+                cwd=tmp_path,
+                capture_output=True,
+                text=True,
+                timeout=40,
+            )
+
+        stop = stop_from_another_directory()
         assert stop.returncode == 0, stop.stderr
         assert json.loads(stop.stdout)['status'] == 'stopped'
         r,second=invoke('start',env);assert r.returncode==0;assert second['pid']!=first['pid']
         with httpx.Client(base_url=f'http://127.0.0.1:{port}',headers={'X-CloudHeron':'1'},trust_env=False) as c:
             login=c.post('/api/login',json={'email':'service@fixture.test','password':'fixture-password-123'});assert login.status_code==200;assert login.json()['user']['id']==user
+
+        # Simulate an abrupt exit of our isolated fixture supervisor.
+        os.kill(second['pid'], signal.SIGKILL)
+        _, orphaned = invoke('status', env)
+        assert orphaned['status'] == 'orphaned'
+        assert orphaned['api_pid'] == second['api_pid']
+        r, refused = invoke('start', env)
+        assert r.returncode == 1 and refused['status'] == 'orphaned'
+        stop = stop_from_another_directory()
+        assert stop.returncode == 0, stop.stderr
+        assert json.loads(stop.stdout)['status'] == 'stopped'
+        assert not (tmp_path / 'runtime' / 'service.json').exists()
+        with socket.socket() as sock:
+            sock.settimeout(1)
+            assert sock.connect_ex(('127.0.0.1', port)) != 0
+
+        r, restarted = invoke('start', env)
+        assert r.returncode == 0 and restarted['status'] == 'ready'
+        with httpx.Client(base_url=f'http://127.0.0.1:{port}',headers={'X-CloudHeron':'1'},trust_env=False) as c:
+            login = c.post('/api/login', json={'email':'service@fixture.test','password':'fixture-password-123'})
+            assert login.status_code == 200 and login.json()['user']['id'] == user
     finally:
         invoke('stop',env)
         with psycopg.connect(admin,autocommit=True) as conn:conn.execute(sql.SQL('DROP DATABASE {} WITH (FORCE)').format(sql.Identifier(name)))
@@ -55,5 +79,10 @@ def test_manager_refuses_unrelated_port_without_stopping_it(tmp_path):
         sock.bind(('127.0.0.1',0));sock.listen();port=sock.getsockname()[1]
         env={**os.environ,'PORT':str(port),'CLOUDHERON_RUN_DIR':str(tmp_path/'unrelated')}
         r,state=invoke('start',env);assert r.returncode==1;assert state['status']=='port_in_use'
-        # Manager never spawned a supervisor or closed the unrelated listener.
-        assert sock.fileno()>=0;assert not (tmp_path/'unrelated/service.json').exists()
+        state_file = tmp_path / 'unrelated' / 'service.json'
+        assert not state_file.exists()
+        state_file.write_text(json.dumps({'pid':os.getpid(), 'api_pid':os.getpid(), 'port':port}))
+        stopped, state = invoke('stop', env)
+        assert stopped.returncode == 1 and state['status'] == 'port_in_use'
+        with socket.create_connection(('127.0.0.1', port), timeout=1):
+            pass
