@@ -20,7 +20,7 @@ cd /Users/bohan/work/AI漫剧
 
 ## Docker 分离部署
 
-Nginx、FastAPI 和 PostgreSQL 分开运行。支持单独启动 PostgreSQL 或连接已有 PG，可配置私有云桶，也提供本机持久 S3 服务。 [Docker 启动、备份与验证](docs/release/DOC-REL-012-Docker分离部署.md)
+Nginx、FastAPI 和 PostgreSQL 分开运行。支持单独启动 PostgreSQL 或连接已有 PG，可配置私有云桶，也提供本机持久 S3 服务。 准备 `.env.docker` 后，执行 `./deploy/start.sh` 启动，执行 `./deploy/stop.sh` 停止并保留数据卷。 [Docker 启动、备份与验证](docs/release/DOC-REL-012-Docker分离部署.md)
 
 ## 手动验收
 
