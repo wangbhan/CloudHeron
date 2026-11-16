@@ -33,7 +33,16 @@ def test_background_start_duplicate_restart_preserves_login_and_stops(tmp_path):
             time.sleep(.2)
         else:raise AssertionError('后台API未恢复')
         assert recovered['pid']==first['pid'];assert recovered['restarts']>=1
-        r,stopped=invoke('stop',env);assert r.returncode==0;assert stopped['status']=='stopped'
+        stop = subprocess.run(
+            [str(ROOT / 'stop.sh'), '--json'],
+            env={**env, 'CLOUDHERON_PYTHON': sys.executable},
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=40,
+        )
+        assert stop.returncode == 0, stop.stderr
+        assert json.loads(stop.stdout)['status'] == 'stopped'
         r,second=invoke('start',env);assert r.returncode==0;assert second['pid']!=first['pid']
         with httpx.Client(base_url=f'http://127.0.0.1:{port}',headers={'X-CloudHeron':'1'},trust_env=False) as c:
             login=c.post('/api/login',json={'email':'service@fixture.test','password':'fixture-password-123'});assert login.status_code==200;assert login.json()['user']['id']==user

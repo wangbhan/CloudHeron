@@ -12,7 +12,7 @@ cd /Users/bohan/work/AI漫剧
 ./start.sh status
 ```
 
-启动后在后台运行，独立于当前终端；重复启动复用现有实例。正常停止使用`./start.sh stop`，有生成任务时等待当前任务完成。电脑重启后再执行一次启动命令，当前未安装系统登录自启动服务。日志在`.work/cloudheron-runtime/service.log`，进程信息在同目录service.json，不提交Git。
+启动后在后台运行，独立于当前终端；重复启动复用现有实例。正常停止使用 `./stop.sh`。如返回 `stopping`，服务正在等待当前任务完成，可用 `./start.sh status` 查看。电脑重启后再执行一次启动命令，当前未安装系统登录自启动服务。日志在`.work/cloudheron-runtime/service.log`，进程信息在同目录service.json，不提交Git。
 
 本机明确配置DEV_STORAGE=moto时启动开发S3模拟器，并按现有配置恢复项目专用PostgreSQL。模拟器对象不持久，正式使用应填写云桶配置并设DEV_STORAGE=external。外部存储与数据库不会被管理脚本停止。
 
