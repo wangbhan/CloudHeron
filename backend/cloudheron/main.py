@@ -69,9 +69,13 @@ def create_app(settings:Settings|None=None):
     def get_db(request:Request):
         with request.app.state.ctx.database.connection() as conn: yield DB(conn)
     Db=Annotated[DB,Depends(get_db)]
-    def current_user(db:Db,session:Annotated[str|None,Security(cookie_scheme)]=None):
+    def current_user(request:Request,db:Db,session:Annotated[str|None,Security(cookie_scheme)]=None):
         u=db.one('SELECT users.* FROM users JOIN sessions ON users.id=sessions.user_id WHERE sessions.hash=%s AND sessions.expires>%s AND users.active',digest(session or ''),now_ms())
         if not u: fail(401,'请登录团队账号')
+        if not u['team_member'] and request.url.path not in (
+            '/api/me','/api/logout','/api/password','/api/team','/api/team/join',
+        ):
+            fail(403,'请先接受邀请加入团队')
         return u
     def get_service(request:Request,db:Db,user:Annotated[dict,Depends(current_user)]): return Service(db,request.app.state.ctx,user)
     Svc=Annotated[Service,Depends(get_service)]
@@ -112,9 +116,62 @@ def create_app(settings:Settings|None=None):
         if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+',email): fail(400,'邮箱格式有误')
         with db.tx():
             db.run('SELECT pg_advisory_xact_lock(91401703)')
-            if db.one('SELECT id FROM users LIMIT 1'): fail(409,'团队已初始化')
+            if db.one('SELECT id FROM users LIMIT 1') or db.one("SELECT key FROM meta WHERE key='team'"): fail(409,'团队已初始化')
             uid_value=uid('usr');db.insert('users',{'id':uid_value,'name':text(b.name,'姓名'),'email':email,'password':password(b.password),'role':'admin'});db.insert('meta',{'key':'team','value':Jsonb(text(b.team,'团队名称'))})
         return session_out(db,response,db.one('SELECT * FROM users WHERE id=%s',uid_value))
+    @api.post('/register',response_model=SessionOut,status_code=201,tags=['账号'])
+    def register_account(b:Register,request:Request,response:Response,db:Db):
+        rate(request)
+        email=text(b.email,'邮箱').lower()
+        if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+',email):
+            fail(400,'邮箱格式有误')
+        encoded=password(b.password)
+        with db.tx():
+            db.run('SELECT pg_advisory_xact_lock(91401703)')
+            existing=db.one('SELECT * FROM users WHERE email=%s FOR UPDATE',email)
+            if existing and (existing['active'] or existing['team_member']):
+                fail(409,'邮箱已注册，请登录或使用邀请链接激活')
+            role='viewer' if db.one('SELECT id FROM users LIMIT 1') else 'admin'
+            user_id=uid('usr')
+            db.insert('users',{'id':user_id,'name':text(b.name,'姓名'),'email':email,
+                              'password':encoded,'role':role,'team_member':False})
+        return session_out(db,response,db.one('SELECT * FROM users WHERE id=%s',user_id))
+
+    @api.post('/team',response_model=MeOut,tags=['团队'])
+    def create_team(b:TeamCreate,s:Svc):
+        s.admin()
+        with s.db.tx():
+            s.db.run('SELECT pg_advisory_xact_lock(91401703)')
+            if s.db.one("SELECT key FROM meta WHERE key='team'"):
+                fail(409,'此部署已有团队，请通过邀请加入')
+            s.db.insert('meta',{'key':'team','value':Jsonb(text(b.name,'团队名称'))})
+            s.db.run('UPDATE users SET team_member=true WHERE id=%s',s.user['id'])
+        return {'user':clean_user(s.db.one('SELECT * FROM users WHERE id=%s',s.user['id'])),
+                'team':b.name.strip()}
+
+    @api.post('/team/join',response_model=MeOut,tags=['团队'])
+    def join_registered_account(b:AcceptInvitation,s:Svc):
+        with s.db.tx():
+            invitation=s.db.one('SELECT * FROM meta WHERE key=%s FOR UPDATE','invite:'+digest(b.token))
+            if not invitation or invitation['value']['expires']<now_ms():
+                fail(400,'邀请无效或已过期')
+            if invitation['value']['user_id']!=s.user['id']:
+                fail(403,'请登录收到邀请的账号后加入')
+            s.db.run('UPDATE users SET team_member=true,role=%s WHERE id=%s',
+                     invitation['value']['role'],s.user['id'])
+            s.db.run('DELETE FROM meta WHERE key=%s',invitation['key'])
+        return {'user':clean_user(s.db.one('SELECT * FROM users WHERE id=%s',s.user['id'])),
+                'team':(s.db.one("SELECT value FROM meta WHERE key='team'") or {}).get('value','')}
+
+    @api.get('/invitations/{token_value}',response_model=InvitationPreview,tags=['团队'])
+    def invitation_preview(token_value:str,db:Db):
+        invitation=db.one('SELECT * FROM meta WHERE key=%s','invite:'+digest(token_value))
+        if not invitation or invitation['value']['expires']<now_ms():
+            fail(400,'邀请无效或已过期')
+        user=db.one('SELECT active FROM users WHERE id=%s',invitation['value']['user_id'])
+        if not user: fail(400,'邀请账号已不存在')
+        return {'registered':user['active']}
+
     @api.post('/login',response_model=SessionOut,tags=['账号'])
     def login(b:Login,request:Request,response:Response,db:Db):
         rate(request);u=db.one('SELECT * FROM users WHERE email=%s AND active',b.email.lower().strip())
@@ -126,10 +183,12 @@ def create_app(settings:Settings|None=None):
         with db.tx():
             inv=db.one('SELECT * FROM meta WHERE key=%s FOR UPDATE',key)
             if not inv or inv['value']['expires']<now_ms(): fail(400,'邀请链接无效或已过期')
+            target=db.one('SELECT active FROM users WHERE id=%s',inv['value']['user_id'])
+            if not target or target['active']: fail(409,'此账号已注册，请登录后接受邀请')
             u=db.one('UPDATE users SET password=%s,active=true WHERE id=%s RETURNING *',encoded,inv['value']['user_id']);db.run('DELETE FROM meta WHERE key=%s',key)
         return session_out(db,response,u)
     @api.get('/me',response_model=MeOut,tags=['账号'])
-    def me(s:Svc): return {'user':clean_user(s.user),'team':s.db.one("SELECT value FROM meta WHERE key='team'")['value']}
+    def me(s:Svc): return {'user':clean_user(s.user),'team':(s.db.one("SELECT value FROM meta WHERE key='team'") or {}).get('value','')}
     @api.post('/logout',response_model=Ok,tags=['账号'])
     def logout(request:Request,response:Response,s:Svc): s.db.run('DELETE FROM sessions WHERE hash=%s',digest(request.cookies.get('cloudheron','')));response.delete_cookie('cloudheron');return {'ok':True}
     @api.post('/password',response_model=SessionOut,tags=['账号'])
@@ -138,21 +197,35 @@ def create_app(settings:Settings|None=None):
         with s.db.tx(): s.db.run('UPDATE users SET password=%s WHERE id=%s',password(b.password),s.user['id']);s.db.run('DELETE FROM sessions WHERE user_id=%s',s.user['id'])
         return session_out(s.db,response,s.user)
     @api.get('/users',response_model=list[UserOut],tags=['成员'])
-    def users(s:Svc): return [clean_user(u) for u in s.db.all('SELECT * FROM users ORDER BY created_at')]
+    def users(s:Svc): return [clean_user(u) for u in s.db.all('SELECT * FROM users WHERE team_member ORDER BY created_at')]
     @api.post('/users',response_model=InvitationOut,status_code=201,tags=['成员'])
     def invite(b:Invite,s:Svc):
-        s.admin();email=text(b.email,'邮箱').lower()
-        if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+',email): fail(400,'邮箱格式有误')
-        tid=token();user_id=uid('usr')
+        s.admin()
+        email=text(b.email,'邮箱').lower()
+        if not re.fullmatch(r'[^@\s]+@[^@\s]+\.[^@\s]+',email):
+            fail(400,'邮箱格式有误')
+        tid=token()
         with s.db.tx():
-            s.db.insert('users',{'id':user_id,'name':text(b.name,'姓名'),'email':email,'password':password(token()),'role':b.role,'active':False});s.db.insert('meta',{'key':'invite:'+digest(tid),'value':{'user_id':user_id,'expires':now_ms()+7*86400000}})
-        return {'user':clean_user(s.db.one('SELECT * FROM users WHERE id=%s',user_id)),'invite_path':'/#join/'+tid}
+            s.db.run('SELECT pg_advisory_xact_lock(91401703)')
+            user=s.db.one('SELECT * FROM users WHERE email=%s FOR UPDATE',email)
+            if user:
+                if user['team_member']: fail(409,'账号已属于团队，请在成员管理中编辑')
+                if not user['active']: fail(400,'账号已停用')
+                user_id=user['id']
+            else:
+                user_id=uid('usr')
+                s.db.insert('users',{'id':user_id,'name':text(b.name,'姓名'),'email':email,
+                                    'password':password(token()),'role':b.role,'active':False})
+            s.db.insert('meta',{'key':'invite:'+digest(tid),
+                               'value':{'user_id':user_id,'role':b.role,'expires':now_ms()+7*86400000}})
+        return {'user':clean_user(s.db.one('SELECT * FROM users WHERE id=%s',user_id)),
+                'invite_path':'/#join/'+tid}
     @api.patch('/users/{user_id}',response_model=UserOut,tags=['成员'])
     def update_user(user_id:str,b:UpdateUser,s:Svc):
         s.admin()
         with s.db.tx():
             s.db.run('SELECT pg_advisory_xact_lock(91401704)');u=s.db.one('SELECT * FROM users WHERE id=%s',user_id)
-            if not u: fail(404,'成员不存在')
+            if not u or not u['team_member']: fail(404,'成员不存在')
             if u['role']=='admin' and u['active'] and (b.role!='admin' or not b.active) and s.db.one("SELECT count(*) n FROM users WHERE role='admin' AND active")['n']<=1: fail(400,'请至少保留一位有效管理员')
             s.db.run('UPDATE users SET name=%s,role=%s,active=%s WHERE id=%s',text(b.name,'姓名'),b.role,b.active,user_id)
             if b.password: s.db.run('UPDATE users SET password=%s WHERE id=%s',password(b.password),user_id)

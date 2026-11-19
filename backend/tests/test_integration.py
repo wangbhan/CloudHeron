@@ -76,7 +76,15 @@ def env():
     stack=ExitStack()
     with stack:
         c=stack.enter_context(TestClient(app,raise_server_exceptions=False))
-        c.headers['X-CloudHeron']='1';r=c.post('/api/setup',json={'name':'QA','team':'PostgreSQL QA','email':'admin@fixture.test','password':'fixture-password-123'});assert r.status_code==201,r.text
+        c.headers['X-CloudHeron']='1'
+        r=c.post('/api/register',json={'name':'QA','email':'admin@fixture.test','password':'fixture-password-123'})
+        assert r.status_code==201,r.text
+        assert not r.json()['user']['team_member']
+        assert c.get('/api/projects').status_code==403
+        r=c.post('/api/team',json={'name':'PostgreSQL QA'})
+        assert r.status_code==200,r.text
+        assert r.json()['user']['team_member']
+        assert c.post('/api/team',json={'name':'second team'}).status_code==409
         ctx={'settings':settings,'app':app,'client':c,'state':state,'fixture':fixture,'clients':[],'stack':stack}
         for role in ('editor','viewer'):
             invited=c.post('/api/users',json={'name':role,'email':role+'@fixture.test','role':role});assert invited.status_code==201
@@ -108,6 +116,46 @@ def test_health_auth_and_pg_jsonb(env):
     assert env['viewer'].get('/api/system/status').status_code==403
     unsigned=TestClient(env['app'],raise_server_exceptions=False);assert unsigned.get('/api/me').status_code==401;unsigned.close()
     with env['app'].state.ctx.database.connection() as conn:assert conn.execute("SELECT pg_typeof(document)::text t FROM workflows LIMIT 1").fetchone()['t']=='jsonb'
+
+def test_public_account_registration_and_invitation_isolation(env):
+    app = env['app']
+    admin = env['client']
+    newcomer = TestClient(app, raise_server_exceptions=False)
+    env['clients'].append(newcomer)
+    newcomer.headers['X-CloudHeron'] = '1'
+    payload = {'email':'personal@fixture.test','name':'个人账号','password':'personal-password-123'}
+    assert newcomer.post('/api/register', json={**payload, 'role':'admin'}).status_code == 422
+    registered = newcomer.post('/api/register', json=payload)
+    assert registered.status_code == 201, registered.text
+    user = registered.json()['user']
+    assert user['active'] and not user['team_member'] and user['role'] == 'viewer'
+    assert newcomer.get('/api/me').json()['user']['id'] == user['id']
+    for path in ('/api/projects','/api/models','/api/workflows','/api/assets','/api/users','/api/skills'):
+        assert newcomer.get(path).status_code == 403, path
+    assert newcomer.post('/api/team', json={'name':'another'}).status_code == 403
+    assert newcomer.post('/api/register', json=payload).status_code == 409
+    assert all(u['id'] != user['id'] for u in admin.get('/api/users').json())
+
+    invite = admin.post('/api/users', json={'name':user['name'],'email':payload['email'],'role':'editor'})
+    assert invite.status_code == 201, invite.text
+    token = invite.json()['invite_path'].split('/')[-1]
+    assert newcomer.get('/api/invitations/'+token).json()['registered'] is True
+    assert not newcomer.get('/api/me').json()['user']['team_member']
+    assert env['editor'].post('/api/team/join', json={'token':token}).status_code == 403
+    assert newcomer.post('/api/join', json={'token':token,'password':'overwritten-password'}).status_code == 409
+
+    joined = newcomer.post('/api/team/join', json={'token':token})
+    assert joined.status_code == 200, joined.text
+    assert joined.json()['user']['id'] == user['id']
+    assert joined.json()['user']['role'] == 'editor'
+    assert joined.json()['user']['team_member']
+    assert newcomer.get('/api/projects').status_code == 200
+    assert newcomer.get('/api/models').status_code == 200
+    assert newcomer.post('/api/team/join', json={'token':token}).status_code == 400
+    assert newcomer.post('/api/team', json={'name':'another'}).status_code == 403
+    assert newcomer.post('/api/logout', json={}).status_code == 200
+    login = newcomer.post('/api/login', json={'email':payload['email'],'password':payload['password']})
+    assert login.status_code == 200 and login.json()['user']['id'] == user['id']
 
 def test_project_permissions_and_last_admin(env):
     c=env['client'];p=c.post('/api/projects',json={'name':'私有','visibility':'private'}).json()

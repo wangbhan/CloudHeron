@@ -5,10 +5,14 @@ from datetime import datetime
 class Contract(BaseModel): model_config=ConfigDict(extra='forbid')
 class ErrorOut(BaseModel): error:str
 class Ok(BaseModel): ok:bool=True
-class UserOut(BaseModel): id:str;name:str;email:str;role:Literal['admin','editor','viewer'];active:bool
+class UserOut(BaseModel): id:str;name:str;email:str;role:Literal['admin','editor','viewer'];active:bool;team_member:bool=True
 class SessionOut(BaseModel): user:UserOut
 class MeOut(SessionOut): team:str
 class Login(Contract): email:str;password:str=Field(min_length=10,max_length=200)
+class Register(Login): name:str
+class TeamCreate(Contract): name:str
+class AcceptInvitation(Contract): token:str
+class InvitationPreview(BaseModel): registered:bool
 class Setup(Login): team:str;name:str
 class Join(Contract): token:str;password:str=Field(min_length=10,max_length=200)
 class ChangePassword(Contract): current:str;password:str=Field(min_length=10,max_length=200)

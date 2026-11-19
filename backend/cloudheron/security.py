@@ -42,8 +42,8 @@ class Vault:
         data=base64.b64decode(value,validate=True)
         return AESGCM(self.key).decrypt(data[:12],data[28:]+data[12:28],None).decode()
 def permission(user,resource,edit=False):
-    if not user or not user['active'] or not resource or (edit and user['role']=='viewer'): return False
+    if not user or not user['active'] or not user.get('team_member',True) or not resource or (edit and user['role']=='viewer'): return False
     if user['role']=='admin' or resource['owner_id']==user['id']: return True
     level=resource.get('acl',{}).get(user['id'])
     return resource['visibility']=='team' or (level=='edit' if edit else level in ('edit','read'))
-def clean_user(u): return {k:u[k] for k in ('id','name','email','role','active')}
+def clean_user(u): return {k:u[k] for k in ('id','name','email','role','active','team_member')}

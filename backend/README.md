@@ -22,7 +22,7 @@ chmod 600 .env
 CLOUDHERON_PYTHON=.venv/bin/python sh scripts/start.sh
 ```
 
-打开 http://127.0.0.1:8800；首次空库创建自己的团队管理员。Swagger：http://127.0.0.1:8800/docs，ReDoc：`/redoc`，规范：`/openapi.json`。启动自动执行 `migrations/001_initial.sql`，执行器每库一个 API 进程（Uvicorn `--workers 1`）；`WORKERS` 控制该进程中的任务并发，默认 2，不是 Uvicorn 进程数。
+打开 http://127.0.0.1:8800；首次空库注册个人账号，登录后创建团队。Swagger：http://127.0.0.1:8800/docs，ReDoc：`/redoc`，规范：`/openapi.json`。启动自动执行 `migrations/001_initial.sql`，执行器每库一个 API 进程（Uvicorn `--workers 1`）；`WORKERS` 控制该进程中的任务并发，默认 2，不是 Uvicorn 进程数。
 
 ## 当前机器的开发环境
 
