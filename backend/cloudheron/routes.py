@@ -100,6 +100,8 @@ def register(api,Svc,Db,settings,**kwargs):
             current=s.db.one('SELECT * FROM chats WHERE id=%s FOR UPDATE',chat_id)
             if s.db.one("SELECT id FROM jobs WHERE source_id=%s AND status IN ('queued','running')",chat_id): fail(409,'当前对话正在生成')
             cfg=s.chat_config(b.config);prompt=text(b.prompt,'创作描述',32000)
+            from .documents import attach_document
+            attach_document(s,c,cfg,b.config.get('document_id'))
             context=load_context(s,c['project_id'],b.context_revision)
             if context:
                 cfg['context_revision']=context['revision']

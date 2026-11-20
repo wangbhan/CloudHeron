@@ -213,3 +213,7 @@ POST /api/creations/{id}/run请求为`{"revision":3,"card_indices":[1,2]}`，0�
 GET `/api/projects/{project_id}/context` 返回降序版本。POST 同一路径使用 `base_revision`（首次为 0）、`description`、`style`、`asset_ids` 创建版本。冲突为 409。项目描述最长 4000 字，视觉风格最长 1000 字，最多 8 个本项目资产版本。
 
 对话消息、工作流 AI 助手、工作流手动运行接受可选整数 `context_revision`。集成创作在作品文档保存该值，规划和执行提交时读取固定版本。选中的描述与风格作为文本上下文，参考资产使用原有显式选择。
+
+## REQ-060 文档图文创作
+
+新增文档上传、列表、详情、分析和确认接口；对话 config 可传 document_id。完整请求、状态和错误见 [DOC-DEV-021 接口对接](DOC-DEV-021-PDF与Word图文创作.md)。当前 OpenAPI 66 路径、82 操作。

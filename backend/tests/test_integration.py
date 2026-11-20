@@ -516,6 +516,76 @@ def test_guided_busy_revision_and_atomic_plan_completion(env):
     assert call_job(env,r.json()['id'])['status']=='completed'
     assert c.put('/api/creations/'+item['id'],json={**doc,'revision':1}).status_code==409
 
+def test_document_parse_analyze_confirm_and_generate(env):
+    from test_documents import sample_docx, sample_pdf
+    c=env['client']
+    cid=chat(env,'文档图文创作')
+    video_model=c.post('/api/models',json={'name':'文档视频夹具','spec':{**env['spec'],'protocol':'vLLM-Omni','video_style':'vllm_omni','video_format':'multipart','capabilities':['video','video_reference']}}).json()
+    for name,data in [('scan.pdf',sample_pdf()),('story.docx',sample_docx())]:
+        r=c.post(f'/api/chats/{cid}/documents',json={'filename':name,'base64':base64.b64encode(data).decode()})
+        assert r.status_code==201,r.text
+        doc=r.json()
+        assert doc['status']=='parsed' and len(doc['content']['images'])==1
+        assert 'file' not in doc
+        body={'prompt':'按文档生成','config':{'agent':'image','model_id':env['model']['id'],'document_id':doc['id']}}
+        assert c.post(f'/api/chats/{cid}/messages',json=body).status_code==400
+        r=c.post('/api/documents/'+doc['id']+'/analyze',json={'model_id':env['model']['id']},headers={'Idempotency-Key':'analyze-'+doc['id']})
+        assert r.status_code==202,r.text
+        result=call_job(env,r.json()['id'])
+        assert result['status']=='completed',result
+        replay=c.post('/api/documents/'+doc['id']+'/analyze',json={'model_id':env['model']['id']},headers={'Idempotency-Key':'analyze-'+doc['id']})
+        assert replay.json()['id']==result['id']
+        row=c.get('/api/documents/'+doc['id']).json()
+        assert row['status']=='analyzed' and row['summary']
+        request=env['state']['received'][-1]['body']['messages'][-1]['content']
+        assert any(block['type']=='image_url' for block in request)
+        image_id=row['content']['images'][0]['asset_id']
+        assert c.post('/api/documents/'+doc['id']+'/confirm',json={'job_id':'stale','summary':'test','asset_ids':[]}).status_code==409
+        confirm=c.post('/api/documents/'+doc['id']+'/confirm',json={'job_id':row['job_id'],'summary':'白鹭与蓝色背景','asset_ids':[image_id]})
+        assert confirm.status_code==200,confirm.text
+        r=c.post(f'/api/chats/{cid}/messages',json=body)
+        assert r.status_code==202,r.text
+        job=call_job(env,r.json()['id'])
+        assert job['status']=='completed',job
+        received=env['state']['received'][-1]
+        assert received['path']=='/v1/images/edits' and received['files']['image'].startswith(b'\xff\xd8')
+        assert '白鹭与蓝色背景' in received['body']['prompt']
+        stored=c.get(f'/api/chats/{cid}').json()['messages'][-2]['config']
+        assert stored['document_context']['summary']=='白鹭与蓝色背景'
+        assert stored['asset_ids']==[image_id]
+        video=c.post(f'/api/chats/{cid}/messages',json={'prompt':'生成文档视频','config':{**config(env,'video',document_id=doc['id']),'model_id':video_model['id']}})
+        assert video.status_code==202,video.text
+        assert call_job(env,video.json()['id'])['status']=='completed'
+        received=next(item for item in reversed(env['state']['received']) if item['path']=='/v1/videos')
+        assert received['files']['input_reference'].startswith(b'\xff\xd8')
+        assert '白鹭与蓝色背景' in received['body']['prompt']
+        assert env['viewer'].post('/api/documents/'+doc['id']+'/confirm',json={'job_id':row['job_id'],'summary':'edit','asset_ids':[]}).status_code==403
+    assert len(c.get(f'/api/chats/{cid}/documents').json())==2
+
+
+def test_document_failed_analysis_retry_and_validation(env):
+    from test_documents import sample_docx
+    c=env['client'];cid=chat(env,'文档错误恢复')
+    path=f'/api/chats/{cid}/documents'
+    assert c.post(path,json={'filename':'bad.pdf','base64':'aW52YWxpZCBmaWxl'}).status_code==400
+    assert c.get(path).json()==[]
+    assert env['viewer'].post(path,json={'filename':'story.docx','base64':base64.b64encode(sample_docx()).decode()}).status_code==403
+    row=c.post(path,json={'filename':'story.docx','base64':base64.b64encode(sample_docx()).decode()}).json()
+    target='/api/documents/'+row['id']
+    broken=c.post('/api/models',json={'name':'不可达分析夹具','spec':{**env['spec'],'base_url':'http://127.0.0.1:1/v1'}}).json()
+    job=c.post(target+'/analyze',json={'model_id':broken['id']}).json()
+    assert call_job(env,job['id'])['status']=='failed'
+    assert c.get(target).json()['job']['error']
+    assert c.post(target+'/confirm',json={'job_id':job['id'],'summary':'未成功','asset_ids':[]}).status_code==409
+    retry=c.post(target+'/analyze',json={'model_id':env['model']['id']}).json()
+    assert retry['id']!=job['id']
+    assert call_job(env,retry['id'])['status']=='completed'
+    assert c.post(target+'/confirm',json={'job_id':retry['id'],'summary':'有效摘要','asset_ids':['other-document']}).status_code==400
+    assert c.post(target+'/confirm',json={'job_id':retry['id'],'summary':'有效摘要','asset_ids':[]}).status_code==200
+    other=chat(env,'其他对话')
+    assert c.post('/api/chats/'+other+'/messages',json={'prompt':'跨对话文档','config':config(env,document_id=row['id'])}).status_code==400
+
+
 def test_reference_validation_before_task_submission(env):
     c=env['client']
     image=c.post('/api/assets',json={'project_id':env['project']['id'],'name':'对话参考',

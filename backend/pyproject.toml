@@ -2,7 +2,7 @@
 name = "cloudheron-backend"
 version = "0.3.4"
 requires-python = ">=3.12"
-dependencies = ["fastapi>=0.143,<0.144", "uvicorn[standard]>=0.54,<0.55", "psycopg[binary,pool]>=3.3,<3.4", "boto3>=1.43,<1.44", "cryptography>=50,<51", "httpx>=0.28,<0.29", "pydantic-settings>=2.15,<3", "python-multipart>=0.0.32,<0.1"]
+dependencies = ["fastapi>=0.143,<0.144", "uvicorn[standard]>=0.54,<0.55", "psycopg[binary,pool]>=3.3,<3.4", "boto3>=1.43,<1.44", "cryptography>=50,<51", "httpx>=0.28,<0.29", "pydantic-settings>=2.15,<3", "python-multipart>=0.0.32,<0.1", "pypdfium2>=5,<6", "Pillow>=12,<13"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]

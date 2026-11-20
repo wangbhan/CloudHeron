@@ -294,6 +294,8 @@ def create_app(settings:Settings|None=None):
     register(api,Svc,Db,settings,version=VERSION)
     from .project_context import register as register_project_context
     register_project_context(api,Svc)
+    from .documents import register as register_documents
+    register_documents(api,Svc)
     app.include_router(api)
     if settings.serve_frontend:
         app.mount('/',StaticFiles(directory=settings.frontend_dir,html=True),name='frontend')

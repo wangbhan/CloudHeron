@@ -95,3 +95,7 @@
 ## 对话参考图与模型验收
 
 [操作与测试](development/DOC-DEV-020-对话参考图与模型验收.md)
+
+## PDF 与 Word 图文创作
+
+[REQ-060 操作、接口与验证](development/DOC-DEV-021-PDF与Word图文创作.md)

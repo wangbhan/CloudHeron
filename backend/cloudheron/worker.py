@@ -147,6 +147,25 @@ class Worker:
         outputs = []
         assistant = None
         creation_update = None
+        if j['source'] == 'document_analysis':
+            step('document', 'running')
+            with authorized() as service:
+                model = service.model(snap['model_id'])
+                images = [service.asset(item['asset_id']) for item in snap['document']['images']]
+            result = api.analyze_document(model, snap['document'], images, {'max_tokens': 4096, **snap['params']})
+            if not result or len(result) > 16000:
+                fail(400, '分析结果过长或为空，请调整模型参数后重试')
+            with authorized() as service, service.db.tx():
+                updated = service.db.one(
+                    "UPDATE documents SET status='analyzed',summary=%s WHERE id=%s AND job_id=%s RETURNING id",
+                    result, j['source_id'], jid,
+                )
+                if not updated:
+                    fail(409, '文档分析版本已变化')
+                step_output = {'document_id': j['source_id']}
+                steps['document'] = {'status': 'completed', 'output': step_output}
+                service.db.run("UPDATE jobs SET status='completed',steps=%s,updated_at=now() WHERE id=%s", Jsonb(steps), jid)
+            return
         if j['source'] == 'creation_plan':
             from .creations.domain import parse_plan
             doc = snap['document']
@@ -168,14 +187,21 @@ class Worker:
                 for message in snap['messages']
                 if message['role'] in ('user', 'assistant') and message.get('text')
             ][-20:]
+            base_prompt = snap['prompt']
+            if cfg.get('document_context'):
+                context = cfg['document_context']
+                document_text = '\n\n【已确认文档 ' + context['filename'] + '】\n' + context['summary']
+                base_prompt += document_text
+                if history:
+                    history[-1]['content'] += document_text
             if cfg['agent'] == 'prompt':
                 result = send_chat(cfg['model_id'], [
                     {'role': 'system', 'content': '你是云鹭提示词 Agent，只返回可用提示词。'},
                     *history[:-1],
-                    {'role': 'user', 'content': with_context(snap['prompt'], project_context)},
+                    {'role': 'user', 'content': with_context(base_prompt, project_context)},
                 ], cfg, cfg['skill_ids'])
             else:
-                prompt = snap['prompt']
+                prompt = base_prompt
                 if cfg.get('text_model_id'):
                     prompt = send_chat(cfg['text_model_id'], [
                         {'role': 'system', 'content': '结合创作历史整理生成提示词，只返回提示词。'},
