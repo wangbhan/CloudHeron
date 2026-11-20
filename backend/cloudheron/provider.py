@@ -9,6 +9,21 @@ def endpoint(spec,key,default):
     if not path and not default.startswith(('/v1/','/v2/')): return '/v1'+default
     return default
 
+class ModelHTTPError(ValueError):
+    def __init__(self,status,message):
+        super().__init__(message)
+        self.status=status
+
+
+def validate_references(kind, refs, spec):
+    caps=spec['capabilities']
+    if any(not a['mime'].startswith(('image/','video/')) for a in refs): raise ValueError('参考须为图片或视频')
+    if kind=='image' and any(a['mime'].startswith('video/') for a in refs): raise ValueError('图片仅支持参考图片')
+    if kind=='image' and refs and 'image_edit' not in caps: raise ValueError('所选图片模型未启用参考图片编辑能力，请在模型配置中启用')
+    if kind=='video' and any(a['mime'].startswith('video/') for a in refs) and 'video_reference' not in caps: raise ValueError('模型未启用参考视频能力')
+    if kind=='video' and spec.get('video_style','vllm_omni' if spec.get('protocol')=='vLLM-Omni' else 'openai')=='vllm_omni' and len(refs)>1: raise ValueError('官方 vLLM-Omni 视频任务每次只支持一个参考文件')
+
+
 class Provider:
     def __init__(self,settings,vault,storage,save): self.settings=settings;self.vault=vault;self.storage=storage;self.save=save
     def redact(self,message,key):
@@ -37,24 +52,43 @@ class Provider:
                         data.extend(chunk)
                     if r.status_code>=300:
                         hint={401:'请核对生成接口的密钥',403:'请核对模型和生成权限',404:'请核对接口路径与协议',429:'请检查额度或速率限制',502:'上游生成服务暂不可用，列表检测成功不代表生成可用',503:'上游服务暂不可用',504:'上游生成服务超时'}.get(r.status_code,'请核对模型与请求参数')
-                        raise ValueError(f'模型 HTTP {r.status_code}（{method} {path}）：{hint}；{self.redact(data.decode(errors="replace"),key)}')
+                        raise ModelHTTPError(r.status_code,f'模型 HTTP {r.status_code}（{method} {path}）：{hint}；{self.redact(data.decode(errors="replace"),key)}')
                     if raw: return bytes(data),r.headers.get('content-type','application/octet-stream').split(';')[0]
                     try: return json.loads(data)
                     except ValueError: raise ValueError('模型未返回有效 JSON')
             except httpx.HTTPError: raise ValueError('模型服务连接失败或超时，请检查地址和服务状态') from None
     def check(self,m):
-        start=time.monotonic();spec=m['spec'];is_claude='text' in spec['capabilities'] and spec.get('text_format', 'claude' if spec.get('protocol')=='Claude' else 'openai')=='claude'
+        start=time.monotonic()
+        spec=m['spec']
+        is_claude='text' in spec['capabilities'] and spec.get('text_format','claude' if spec.get('protocol')=='Claude' else 'openai')=='claude'
+        path=endpoint(spec,'models','/v1/models' if spec.get('interface_style')=='minimax_v2' else '/models')
+        unsupported=False
         try:
-            result=self.request(m,endpoint(spec,'models','/v1/models' if spec.get('interface_style')=='minimax_v2' else '/models'),timeout=self.settings.model_check_timeout,claude=is_claude)
+            deadline=start+self.settings.model_check_timeout
+            for attempt in range(2):
+                try:
+                    result=self.request(m,path,timeout=max(.001,deadline-time.monotonic()),claude=is_claude)
+                    break
+                except ModelHTTPError as error:
+                    if error.status not in (502,503,504) or attempt or deadline-time.monotonic()<.2:
+                        raise
+                    time.sleep(.15)
             if spec.get('interface_style') in ('minimax','minimax_v2'):
                 from .models.minimax import checked
                 checked(self,m,result)
-            if not isinstance(result,dict) or not isinstance(result.get('data'),list): raise ValueError('模型列表响应缺少 data 数组，请检查 models 路径')
+            if not isinstance(result,dict) or not isinstance(result.get('data'),list):
+                raise ValueError('模型列表响应缺少 data 数组，请检查 models 路径')
             models=[x['id'] for x in result['data'] if isinstance(x,dict) and isinstance(x.get('id'),str)][:200]
             available=spec['model'] in models
-            return {'ok':True,'status':'success' if available else 'warning','models':models,'model_available':available,'elapsed_ms':round((time.monotonic()-start)*1000),'scope':'model_list','generation_verified':False,'note':'模型列表可读，已发现所填模型；尚未验证生成接口及其权限，请使用“验证生成”' if available else '模型列表可读，但未发现所填模型；可保存配置，生成能力仍须实际验收'}
-        except ValueError as e:
-            return {'ok':False,'status':'failed','models':[],'model_available':None,'elapsed_ms':round((time.monotonic()-start)*1000),'scope':'model_list','generation_verified':False,'note':self.redact(str(e),self.vault.decrypt(m['secret']))}
+            return {'ok':True,'status':'success' if available else 'warning','models':models,'model_available':available,
+                    'elapsed_ms':round((time.monotonic()-start)*1000),'scope':'model_list','generation_verified':False,
+                    'note':'模型列表可读，已发现所填模型；尚未验证生成接口及其权限，请使用“验证生成”' if available else '模型列表可读，但未发现所填模型；可保存配置，生成能力仍须实际验收'}
+        except ValueError as error:
+            unsupported=isinstance(error,ModelHTTPError) and error.status in (404,405)
+            note=('服务未提供模型列表接口；请核对列表路径，或点击“验证生成”检查实际能力。' if unsupported else
+                  self.redact(str(error),self.vault.decrypt(m['secret'])))
+            return {'ok':False,'status':'warning' if unsupported else 'failed','models':[],'model_available':None,
+                    'elapsed_ms':round((time.monotonic()-start)*1000),'scope':'model_list','generation_verified':False,'note':note}
     def chat(self,m,messages,params=None):
         spec=m['spec']
         if 'text' not in spec['capabilities']: raise ValueError('模型未启用文本能力')
@@ -115,15 +149,11 @@ class Provider:
         spec=m['spec'];caps=spec['capabilities'];paths=spec.get('paths',{})
         if kind not in caps: raise ValueError('模型未启用对应生成能力')
         if not prompt.strip(): raise ValueError('请填写画面提示词')
-        if any(not a['mime'].startswith(('image/','video/')) for a in refs): raise ValueError('参考须为图片或视频')
-        if kind=='image' and any(a['mime'].startswith('video/') for a in refs): raise ValueError('图片仅支持参考图片')
-        if kind=='image' and refs and 'image_edit' not in caps: raise ValueError('模型未启用参考图片编辑能力')
-        if kind=='video' and any(a['mime'].startswith('video/') for a in refs) and 'video_reference' not in caps: raise ValueError('模型未启用参考视频能力')
+        validate_references(kind,refs,spec)
         if (kind=='image' and spec.get('image_style')=='minimax') or (kind=='video' and spec.get('video_style') in ('minimax','minimax_v2')):
             from .models.minimax import generate
             return generate(self,m,kind,prompt,refs,params)
         omni=kind=='video' and spec.get('video_style','vllm_omni' if spec.get('protocol')=='vLLM-Omni' else 'openai')=='vllm_omni'
-        if omni and len(refs)>1: raise ValueError('官方 vLLM-Omni 视频任务每次只支持一个参考文件')
         body={**request_options(kind,params,spec),'model':spec['model'],'prompt':prompt}
         if params.get('size'): body['size']=params['size']
         if kind=='video': body['seconds']=str(params.get('seconds',4))

@@ -516,6 +516,26 @@ def test_guided_busy_revision_and_atomic_plan_completion(env):
     assert call_job(env,r.json()['id'])['status']=='completed'
     assert c.put('/api/creations/'+item['id'],json={**doc,'revision':1}).status_code==409
 
+def test_reference_validation_before_task_submission(env):
+    c=env['client']
+    image=c.post('/api/assets',json={'project_id':env['project']['id'],'name':'对话参考',
+        'kind':'image','visibility':'private','mime':'image/png','filename':'ref.png',
+        'base64':base64.b64encode(PNG).decode()}).json()
+    model=c.post('/api/models',json={'name':'纯文生图','spec':{**env['spec'],'capabilities':['image']}}).json()
+    cid=chat(env,'参考能力校验')
+    body={'prompt':'测试','config':{'agent':'image','model_id':model['id'],'asset_ids':[image['id']]}}
+    before=len(env['state']['received'])
+    bad=c.post('/api/chats/'+cid+'/messages',json=body)
+    assert bad.status_code==400 and '参考图片编辑' in bad.json()['error']
+    assert c.get('/api/chats/'+cid).json()['messages']==[]
+    assert len(env['state']['received'])==before
+    body['config']['model_id']=env['model']['id']
+    job=c.post('/api/chats/'+cid+'/messages',json=body)
+    assert job.status_code==202,job.text
+    assert call_job(env,job.json()['id'])['status']=='completed'
+    assert env['state']['received'][-1]['files']['image']==PNG
+
+
 def test_project_context_permissions_and_immutable_revisions(env):
     client = env['client']
     project = client.post('/api/projects', json={'name': '设定权限项目', 'visibility': 'private'}).json()

@@ -5,6 +5,7 @@ from .db import now
 from .security import fail,uid,permission,text,digest,now_ms
 from .domain import workflow,options,AGENTS,TEMPLATES
 from .storage import sniff
+from .provider import validate_references
 
 def job_view(j): return {k:v for k,v in j.items() if k!='snapshot'} if j else None
 def asset_view(a): return {**{k:v for k,v in a.items() if k!='file'},'url':'/api/assets/'+a['id']+'/media'}
@@ -107,7 +108,7 @@ class Service:
         if a['id']!='prompt':
             refs=raw.get('asset_ids',[])
             if not isinstance(refs,list) or len(refs)>8 or any(not isinstance(x,str) for x in refs): fail(400,'参考资产列表有误')
-            for aid in refs: self.asset(aid)
+            validate_references(kind,[self.asset(aid) for aid in refs],m['spec'])
             cfg.update(asset_ids=refs,text_model_id=raw.get('text_model_id',''),size=raw.get('size',a['defaults']['size']))
             if not isinstance(cfg['size'],str) or len(cfg['size'])>80: fail(400,'分辨率有误')
             if cfg['text_model_id']:
