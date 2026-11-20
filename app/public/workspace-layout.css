@@ -1,0 +1,254 @@
+/* One page scroll for lists; bounded panes for editors. Sticky header=10, batch=11. */
+.main{--layout-line:color-mix(in srgb,var(--line) 65%,var(--surface));display:flex;flex-direction:column;min-width:0}
+.main *{min-width:0}
+.main>.topbar{position:sticky;top:0;z-index:10;flex:none;height:56px;min-height:56px;padding:0 28px;background:var(--header)}
+.main>.page{width:100%;max-width:1640px;margin:0 auto;padding:24px 28px 36px}
+.main .page-head{margin-bottom:22px;gap:20px}
+.main .page-head h1{font-size:24px;font-weight:650;letter-spacing:-.5px}
+.main .page-head p{font-size:12px;margin-top:7px;line-height:1.7}
+.main .head-actions{gap:8px;align-items:center}
+body .main :is(.card,.chat-stage,.studio-section,.model-card){box-shadow:none;border-color:var(--layout-line)}
+body .main .btn:where(:not(.primary,.active,.danger,.ghost)){color:var(--secondary);border-color:var(--line);background:var(--surface);font-weight:500}
+.main .btn:not(.primary):enabled:hover{background:var(--panel);border-color:var(--accent-border);color:var(--accent)}
+.main .btn.ghost{border-color:transparent;background:transparent}
+.main .input{font-size:13px;min-height:38px;border-radius:8px}
+.main textarea.input{min-height:100px;line-height:1.7}
+.main .form-field label{font-size:12px;line-height:1.5;margin-bottom:7px;font-weight:500}
+.main .note{line-height:1.65}
+.main .card-body{padding:20px}
+.main .toolbar{gap:12px;align-items:center;flex-wrap:wrap}
+.main .search{min-width:140px}
+.main .project-banner{padding:0;border:0;background:none;border-radius:0;margin-bottom:24px}
+.main .project-banner .page-head h1{border:0;padding:0}
+.main .project-output-card{border-radius:12px;overflow:hidden}
+.main .project-collection{border:0;background:transparent;padding:6px 0;gap:8px}
+.main .project-collections{gap:16px;margin:18px 0}
+.main .project-group{border:0;box-shadow:none}
+.main .list-card{padding:18px 4px;border:0;border-bottom:1px solid var(--layout-line);border-radius:0;background:transparent;box-shadow:none}
+.main .list-card:hover{background:var(--panel)}
+.main .section-label{font-size:13px;margin:26px 0 16px}
+.sidebar{overflow-y:auto;overscroll-behavior-y:contain}
+.sidebar :is(.brand,.team-picker,.user-block){flex-shrink:0}
+:is(.app-nav-toggle,.navigation-close,.workspace-panel-close,.workspace-panel-toggle){display:none}
+.topbar-leading{display:flex;gap:12px;align-items:center;min-width:0}
+.workspace-panel-title{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.main[data-view="create"],.main[data-view="workflow"][data-detail="true"]{height:100dvh;min-height:0;overflow:hidden}
+.main[data-view="create"]>.page{flex:1;min-height:0;display:flex;flex-direction:column;padding-bottom:20px}
+.main .create-layout{display:grid;grid-template-columns:224px minmax(0,1fr) 288px;grid-template-rows:minmax(0,1fr);gap:0;flex:1;min-height:0;border:1px solid var(--layout-line);border-radius:14px;background:var(--surface);overflow:hidden}
+.main .create-thread{display:flex;flex-direction:column;height:auto;max-height:none;min-height:0;padding:18px 12px;border:0;border-right:1px solid var(--layout-line);border-radius:0;background:transparent;box-shadow:none;overflow:hidden}
+.main .create-thread>h3{padding:0 8px;margin:0 0 16px;font-size:13px;font-weight:600}
+.main .create-thread>.compact{width:100%;min-width:0;margin:0}
+.main .create-hiprompt{display:block;flex:1;min-height:0;margin-top:16px;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
+.main .compact-group{padding:0;margin:0 0 18px}
+.main .compact-group header{padding:6px 8px 10px;gap:8px;border:0;flex-wrap:wrap}
+.main .compact-group header>a{font-size:12px;flex-basis:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.main .compact-group header .badge{background:transparent;padding:0;font-size:10px}
+.main .compact-group header .btn{margin-left:auto;padding:3px 6px;min-height:25px;font-size:10px}
+.main .thread-link{padding:11px 10px;margin:2px 0;line-height:1.5;border-radius:7px}
+.main .thread-link strong{display:block;font-size:12px;font-weight:450;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.main .thread-link.active{background:var(--accent-tint);color:var(--accent)}
+.main .chat-stage{display:flex;flex-direction:column;min-height:0;max-height:none;height:100%;border:0;border-radius:0;background:transparent;overflow:hidden}
+.main .chat-title{display:flex;align-items:center;justify-content:space-between;gap:12px;flex:none;min-height:56px;padding:16px 24px;border-bottom:1px solid var(--layout-line);font-size:13px}
+.main .chat-title .badge{max-width:45%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.main .chat-feed{flex:1;min-height:0;max-height:none;padding:24px;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
+.main .chat-feed .message{max-width:800px;margin:0 auto 22px;gap:12px}
+.main .message .bubble{font-weight:400;max-width:100%;border:0;border-radius:12px}
+.main .message-text{font-size:13px;line-height:1.85;font-weight:400}
+.main .message .output-media{max-width:640px}
+.main .message .output-media :is(img,video){max-height:360px}
+.main .creator-compose{flex:none;min-height:0;padding:14px 20px 18px;border:0;background:var(--surface)}
+.main .compose-input{padding:14px;border-radius:12px;border-color:var(--line)}
+.main .creator-compose .compose-input textarea.input{min-height:66px;max-height:140px;min-width:0}
+.main .compose-toolbar{margin-top:10px}
+.main .document-panel.has-documents{border:0;margin-top:8px;padding:8px 10px;border-radius:8px}
+.main .document-panel .form-field{margin:0 0 6px}
+.main .document-panel .form-field label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.main .document-panel .input{min-height:30px;padding:4px 0;border:0;background:transparent}
+.main .document-state .note{font-size:11px}
+.main .chat-reference-list{flex-wrap:nowrap;overflow-x:auto;overscroll-behavior-inline:contain;padding:8px 0 2px}
+.main .chat-reference-list figure{flex:none;width:72px;gap:4px}
+.main .chat-reference-list :is(img,video){width:72px;height:48px;border-radius:6px}
+.main .chat-reference-list figcaption{font-size:10px}
+.main .chat-reference-list .btn{padding:2px 5px;font-size:10px;min-height:22px}
+.main .create-settings{display:block;grid-column:auto;height:100%;min-height:0;max-height:none;border:0;border-left:1px solid var(--layout-line);border-radius:0;background:transparent;box-shadow:none;overflow-y:auto;overscroll-behavior-y:contain;scrollbar-gutter:stable}
+.main .create-settings .card-body{display:block;padding:18px}
+.main .create-settings h3{font-size:13px;line-height:1.5;font-weight:600;margin:0 0 20px}
+.main .create-settings .form-field{margin:16px 0 0}
+.main .create-settings .input{min-height:36px}
+.main .skill-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;border:0;border-top:1px solid var(--layout-line);border-radius:0;margin-top:20px;padding:12px 0 0}
+.main .skill-picker legend{padding:0 0 6px;font-size:11px}
+.main .skill-picker label{margin:0;font-size:11px;line-height:1.55;gap:5px}
+.main .create-settings .api-options{border:0;border-top:1px solid var(--layout-line);border-radius:0;padding:14px 0;margin-top:18px}
+.main .api-options summary{cursor:pointer}
+.main .workflow-product{display:flex;flex:1;flex-direction:column;height:auto;min-height:0;overflow:hidden}
+.main .wf-heading{display:flex;flex-direction:row;align-items:center;justify-content:space-between;gap:16px;flex:none;padding:15px 20px;border-bottom:1px solid var(--layout-line)}
+.main .workflow-identity{min-width:150px;flex:1}
+.main .workflow-identity>a{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.main .wf-heading h2{display:flex;align-items:center;gap:10px;font-size:15px;line-height:1.6;margin-top:5px}
+.main #workflow-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0;min-width:0}
+.main #dirty-label{flex:none;font-size:10px;margin:0}
+.main .workflow-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.main .workflow-actions .btn{font-size:11px;min-height:32px;padding:7px 10px;white-space:nowrap}
+.main .workflow-history{display:flex;gap:4px;padding-right:8px;border-right:1px solid var(--layout-line)}
+.main .workflow-actions-menu{position:relative}
+.main .workflow-actions-menu>summary{list-style:none;cursor:pointer;border:1px solid var(--line);border-radius:7px;padding:7px 10px;font-size:11px;line-height:16px;color:var(--secondary);background:var(--surface)}
+.main .workflow-actions-menu>summary::-webkit-details-marker{display:none}
+.workflow-more-content{position:absolute;right:0;top:calc(100% + 8px);z-index:12;width:230px;max-height:min(480px,65dvh);overflow-y:auto;padding:8px;border:1px solid var(--line);border-radius:10px;background:var(--surface);box-shadow:0 12px 40px color-mix(in srgb,var(--ink) 12%,transparent)}
+.main .workflow-more-content .btn{display:flex;width:100%;justify-content:flex-start;border:0;background:transparent;border-radius:6px;font-size:12px;padding:10px}
+.main .workflow-more-content>.compact{width:100%;min-width:0;margin:8px 0 0;font-size:11px}
+.main .wf-run-summary{flex:none;padding:9px 20px;border:0;border-bottom:1px solid var(--layout-line);font-size:11px;background:var(--surface)}
+.main .workflow-context{flex:none;padding:8px 20px;border-color:var(--layout-line)}
+.main .wf-body{display:grid;grid-template-columns:164px minmax(0,1fr) 300px;grid-template-rows:minmax(0,1fr);flex:1;min-height:0}
+.main .node-library{display:block;min-height:0;padding:18px 10px;border-color:var(--layout-line);overflow-y:auto}
+.main .node-library h3{display:flex;font-size:13px;margin:0 8px 12px}
+.main .node-library>p{font-size:11px;margin:0 8px 14px}
+.main .node-library-item.btn{border:0;background:transparent;padding:10px 8px;font-size:12px;min-height:38px;white-space:normal;border-radius:7px}
+.main .node-library-item.btn:hover{background:var(--panel)}
+.main .node-library-item .icon{color:var(--muted);width:16px;height:16px}
+.main .node-hint{font-size:11px;margin:24px 8px 0;line-height:1.8}
+.main .canvas-area{height:auto;min-height:0}
+.main .canvas-scroller{overscroll-behavior:contain}
+.main .canvas-footer{flex-direction:row;align-items:center;flex-wrap:wrap;flex:none;padding:10px 14px;border-color:var(--layout-line);font-size:11px}
+.main .workflow-side{display:flex;flex-direction:column;min-height:0;max-height:none;overflow:hidden;border-color:var(--layout-line)}
+.main .workflow-side>.tabs{flex:none;overflow-x:auto;border-bottom:1px solid var(--layout-line)}
+.main .workflow-side-content,.main #job-panel{flex:1;min-height:0;overflow-y:auto;overscroll-behavior-y:contain}
+.main .workflow-side>[hidden]{display:none}
+.main .workflow-side-content{padding:18px}
+.main .workflow-side .form-field{margin-bottom:16px}
+.main .node-library .workspace-panel-close{margin-left:auto}
+.main .workspace-panel-controls{display:none}
+.workspace-panel[popover]:not(:popover-open){display:none}
+.workspace-panel[popover]:popover-open{position:fixed;inset:72px 16px 16px auto;margin:0;width:min(360px,calc(100vw - 32px));height:auto;min-height:0;max-height:none;border:1px solid var(--line);border-radius:12px;background:var(--surface);color:var(--ink);box-shadow:0 20px 70px color-mix(in srgb,var(--ink) 18%,transparent)}
+.workspace-panel[popover]::backdrop{background:color-mix(in srgb,var(--bg) 32%,transparent)}
+.workspace-panel[popover] .workspace-panel-close{display:inline-flex}
+.main .create-thread[popover]:popover-open{display:flex;border:1px solid var(--line);padding:18px}
+.main .create-settings[popover]:popover-open{display:block;border:1px solid var(--line)}
+.main .node-library[popover]:popover-open{display:block;border:1px solid var(--line);padding:20px 14px;overflow-y:auto}
+.main .node-library[popover] .node-hint,.main .node-library[popover]>p{display:block}
+.main .workflow-side[popover]:popover-open{display:flex;border:1px solid var(--line)}
+.main .workflow-side[popover]>.workspace-panel-controls{display:flex;justify-content:flex-end;padding:8px 12px 0}
+.main .model-card{padding:20px 22px;border-radius:12px}
+.main .model-symbol{border:0;background:var(--panel)}
+.main .model-card dl{margin:20px 0;gap:11px}
+.main .model-card footer{border-color:var(--layout-line);flex-wrap:wrap}
+.main .model-explainer{padding:0;margin-bottom:24px;border:0;background:transparent}
+.main .model-toolbar{gap:16px}
+.main .model-tabs .btn{border-color:transparent;background:transparent}
+.main .studio-intro{font-size:12px;line-height:1.75;color:var(--muted);margin:0 0 20px}
+.main .studio-steps{gap:24px;margin:20px 0 30px}
+.main .studio-steps span{display:flex;align-items:center;gap:10px;padding:0;border:0;border-radius:0;background:transparent;font-size:13px}
+.main .studio-steps b{display:grid;place-items:center;flex:none;width:26px;height:26px;border-radius:50%;background:var(--panel);font-size:11px;margin:0;color:var(--muted)}
+body .main .studio-section{padding:28px 0;margin-top:28px;border:0;border-top:1px solid var(--layout-line);border-radius:0;background:transparent}
+.main .studio-form>.studio-section:first-child{border-top:0;margin-top:0;padding-top:0}
+.main .studio-section h2{font-size:17px;margin-bottom:20px;font-weight:600}
+.main .studio-card-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.main .studio-scene{grid-template-columns:28px minmax(0,1fr);gap:10px;padding:18px;border:1px solid var(--layout-line);border-radius:12px;background:var(--surface)}
+.main .studio-scene textarea{min-height:104px}
+.main .studio-batch-bar{top:68px;z-index:11;padding:12px 18px;border-color:var(--line);border-radius:12px}
+.main .studio-batch-bar strong{font-size:14px}
+.main .studio-batch-bar p{font-size:11px}
+.main .table-scroll{overflow:auto;max-width:100%;overscroll-behavior-inline:contain}
+.main .table-scroll .datatable{display:table;width:100%;min-width:650px;white-space:normal}
+.main .test-case{border:0;border-bottom:1px solid var(--layout-line);border-radius:0;box-shadow:none;background:transparent}
+.main .test-case summary{padding:18px 0}
+.main .test-case-body{padding:0 0 24px}
+dialog{max-height:calc(100dvh - 48px);overflow:hidden;border-radius:14px}
+dialog>#modal-form{display:flex;flex-direction:column;max-height:calc(100dvh - 50px)}
+dialog header,dialog footer{flex:none}
+dialog .dialog-body{min-height:0;max-height:none;overflow-y:auto;overscroll-behavior-y:contain}
+:is(.main,.sidebar,.create-hiprompt,.create-settings,.chat-feed,.canvas-scroller,.node-library,.workflow-side-content,#job-panel,.dialog-body,.workflow-more-content,.table-scroll,.chat-reference-list){scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted) 75%,transparent) transparent}
+@media(min-width:761px) and (max-width:1100px){
+  :root{--nav:76px}
+  .sidebar{align-items:center;padding-inline:12px}
+  .sidebar .brand>div:not(.brandmark),.sidebar .team-picker,.sidebar .nav-label,.sidebar .user-name,.sidebar .user-block>.avatar{display:none}
+  .sidebar .brand{padding:0;margin-bottom:22px}
+  .sidebar .nav-item{width:42px;justify-content:center;padding:11px;margin:4px 0}
+  .sidebar .nav-item span{display:none}
+  .sidebar .user-block{padding-inline:0;justify-content:center}
+}
+@media(max-width:1279px){
+  .main .create-layout{grid-template-columns:minmax(0,1fr)}
+  .main .workspace-panel-toggle.chat-panel-toggle{display:inline-flex}
+}
+@media(max-width:1100px){
+  .main .wf-body{grid-template-columns:minmax(0,1fr)}
+  .main .workspace-panel-toggle.canvas-panel-toggle{display:inline-flex}
+  .main .workflow-actions{width:100%;justify-content:flex-start}
+  .main .wf-heading{align-items:flex-start;flex-wrap:wrap}
+  .main .workflow-identity{flex-basis:100%}
+}
+@media(max-width:760px){
+  .main{margin-left:0}
+  .main>.topbar{padding:0 16px;height:56px}
+  .main .top-actions{gap:8px}
+  .main .mobile-account{display:none}
+  .main .top-actions>a[href="#testing"]{display:none}
+  .app-nav-toggle{display:inline-flex}
+  .sidebar[popover]:not(:popover-open){display:none}
+  .sidebar[popover]:popover-open{display:flex;align-items:stretch;position:fixed;inset:0 auto 0 0;width:248px;max-width:calc(100vw - 48px);height:100dvh;max-height:100dvh;margin:0;padding:20px 14px;border:0;border-right:1px solid var(--line);border-radius:0;background:var(--header);color:var(--ink);overflow-y:auto}
+  .sidebar[popover]::backdrop{background:color-mix(in srgb,var(--bg) 55%,transparent)}
+  .sidebar[popover] .navigation-close{display:inline-flex;align-self:flex-end;margin-bottom:12px}
+  .sidebar[popover] .brand{justify-content:flex-start;margin-bottom:18px}
+  .sidebar[popover] .brand>div:not(.brandmark),.sidebar[popover] .brand strong,.sidebar[popover] .brand small{display:block}
+  .sidebar[popover] .team-picker{display:flex;margin:12px 0}
+  .sidebar[popover] .nav-label{display:block}
+  .sidebar[popover] .nav-item{display:flex;width:100%;justify-content:flex-start;margin:2px 0;gap:10px;padding:11px}
+  .sidebar[popover] .nav-item span,.sidebar[popover] .nav-item .icon{display:inline}
+  .sidebar[popover] .user-block{display:flex;margin-top:auto;padding-top:18px}
+  .main>.page{padding:18px 16px 28px}
+  .main .page-head{align-items:flex-start;flex-direction:column;gap:14px;margin-bottom:18px}
+  .main .page-head h1{font-size:21px}
+  .main .page-head p{font-size:11px}
+  .main[data-view="create"]>.page{padding:16px 12px 12px}
+  .main[data-view="create"] .page-head{flex-direction:row;align-items:center;gap:8px;margin-bottom:14px}
+  .main[data-view="create"] .page-head p{display:none}
+  .main[data-view="create"] .head-actions{gap:6px}
+  .main[data-view="create"] .head-actions .btn{font-size:10px;padding:7px}
+  .main .chat-title{padding:12px 14px;min-height:46px}
+  .main .chat-feed{padding:16px 12px}
+  .main .creator-compose{padding:12px}
+  .main .compose-input{padding:11px}
+  .main .compose-toolbar .compose-hint{font-size:10px}
+  .main .workflow-actions{gap:6px}
+  .main .workflow-history{padding-right:6px;gap:3px}
+  .main .wf-heading{padding:12px;gap:10px}
+  .main .workflow-actions .btn{font-size:10px;padding:7px;min-height:30px}
+  .main .workflow-actions-menu>summary{font-size:10px;padding:6px 8px}
+  .main .canvas-footer{font-size:10px;padding:8px 12px}
+  .main #workflow-save-hint{display:none}
+  .main .wf-run-summary{padding:8px 12px;font-size:10px}
+  .main .studio-card-list,.main .studio-grid,.main .model-cards{grid-template-columns:1fr}
+  body .main .studio-section{padding:24px 0}
+  .main .studio-batch-bar{top:64px;flex-direction:row;align-items:center;gap:12px;padding:12px}
+  .main .studio-batch-bar p{max-width:28ch}
+  .main .studio-batch-bar .btn{padding:9px;font-size:11px}
+  .main .model-toolbar{align-items:stretch}
+  .main .model-card{padding:18px}
+  .main .studio-steps{grid-template-columns:1fr;gap:12px}
+  .main .diff{grid-template-columns:1fr}
+  dialog{max-height:calc(100dvh - 24px)}
+  dialog>#modal-form{max-height:calc(100dvh - 26px)}
+  dialog{width:calc(100vw - 24px)}
+  dialog header,dialog footer{padding:14px 16px}
+  dialog .dialog-body{padding:18px}
+}
+@media(max-height:740px){
+  .main[data-view="create"] .page-head p{display:none}
+  .main .chat-title{min-height:44px;padding-block:10px}
+  .main .creator-compose .compose-input textarea.input{min-height:46px}
+  .main .creator-compose{padding-block:10px}
+  .main .page-head{margin-bottom:14px}
+}
+@media(prefers-reduced-motion:reduce){.main *{scroll-behavior:auto;transition:none;animation:none}}
+
+.main :is(input,textarea)::placeholder{color:var(--muted);opacity:1}
+
+.main .create-settings .card-body{padding-top:0}
+.main .create-settings .workspace-panel-title{position:sticky;top:0;z-index:1;margin-bottom:0;padding:18px 0 14px;background:var(--surface)}
+
+/* Hide inline panes immediately while the media-query listener updates popover mode. */
+@media(max-width:1279px){:is(#chat-history-panel,#chat-settings):not(:popover-open){display:none}}
+@media(max-width:1100px){:is(#workflow-node-panel,#workflow-inspector):not(:popover-open){display:none}}
+@media(max-width:760px){#workspace-nav:not(:popover-open){display:none}}
+
+.main .studio-columns textarea.input{min-height:150px}

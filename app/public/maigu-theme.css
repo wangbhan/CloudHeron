@@ -82,7 +82,7 @@ a { color: var(--accent); }
   font-weight: 700;
 }
 
-:is(body, body.light) :is(.btn, .top-actions .theme-btn) {
+:is(body, body.light) .btn, :is(body, body.light) .top-actions .theme-btn {
   background: var(--surface);
   color: var(--accent);
   border: 1px solid var(--accent-border);
@@ -107,7 +107,7 @@ a { color: var(--accent); }
 :is(body, body.light) .form-field label { color: var(--secondary); }
 input[type="checkbox"] { accent-color: var(--action); }
 
-:is(body, body.light) :is(.card, .chat-stage, .assistant, .studio-section, .studio-batch-bar, #dialog) {
+:is(body, body.light) :is(.card, .chat-stage, .assistant, .studio-section, .studio-batch-bar), #dialog {
   background: var(--surface);
   color: var(--ink);
   border-color: var(--line);
