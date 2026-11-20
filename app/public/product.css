@@ -28,3 +28,44 @@ body{margin:0}a.brand,a.nav-item,a.project-content-button{text-decoration:none;c
 .chat-reference-panel{margin:12px 0}.chat-reference-panel>.row{gap:8px;flex-wrap:wrap}.chat-reference-list{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px}.chat-reference-list figure{width:106px;margin:0;display:grid;gap:5px}.chat-reference-list img,.chat-reference-list video{height:76px;width:100%;object-fit:cover;border:1px solid var(--line);border-radius:7px}.chat-reference-list figcaption{font-size:11px;overflow-wrap:anywhere}.reference-picker{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}.reference-picker label{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:10px;border:1px solid var(--line);border-radius:8px}.reference-picker img,.reference-picker video{width:100%;height:110px;object-fit:contain}.reference-picker span{font-size:12px;overflow-wrap:anywhere}
 
 .document-panel{margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:8px}.document-panel>.row{flex-wrap:wrap;gap:8px}.document-panel .form-field{margin-top:10px}.document-state p{margin:6px 0;font-size:12px}.document-text{white-space:pre-wrap;max-height:240px;overflow:auto;font:12px/1.8 sans-serif}
+
+/* Unified attachment entry, using the workspace's existing palette and radii. */
+.compose-input{padding:16px;border:1px solid var(--line);border-radius:14px;background:var(--surface);transition:border-color .15s,box-shadow .15s}
+.compose-input:focus-within{border-color:var(--accent-border);box-shadow:0 0 0 3px var(--accent-tint)}
+.creator-compose .compose-input .form-field{margin:0}
+.compose-input label[for="chat-prompt"]{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.creator-compose .compose-input textarea.input{padding:0;min-height:84px;max-height:240px;border:0;border-radius:0;background:transparent;color:var(--ink);box-shadow:none}
+.creator-compose .compose-input textarea.input:focus{box-shadow:none}
+.compose-toolbar{display:flex;align-items:center;gap:12px;margin-top:14px}
+.compose-toolbar .compose-hint{flex:1;min-width:0;color:var(--muted);font-size:11px;line-height:1.5}
+.compose-toolbar>.btn{flex:none;white-space:nowrap}
+.attachment-add{display:grid;place-items:center;width:36px;height:36px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--secondary);transition:border-color .15s,color .15s}
+.attachment-add:hover:not(:disabled),.compose-attachments:has(.attachment-menu:popover-open) .attachment-add{background:var(--accent-tint);border-color:var(--accent-border);color:var(--accent)}
+.attachment-add .icon{width:20px;height:20px}
+.attachment-add:focus-visible,.attachment-option:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.attachment-menu{position:fixed;inset:auto;margin:0;padding:8px;width:280px;max-width:calc(100vw - 32px);overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface);color:var(--ink);box-shadow:0 12px 40px color-mix(in srgb,var(--ink) 12%,transparent)}
+.attachment-menu::backdrop{background:transparent}
+.attachment-menu-title{padding:8px 10px 10px;font-size:11px;font-weight:500;color:var(--muted)}
+.attachment-option{display:flex;align-items:center;gap:12px;width:100%;padding:11px 10px;border-radius:9px;text-align:left;color:var(--ink)}
+.attachment-option:hover:not(:disabled),.attachment-option:focus-visible{background:var(--panel)}
+.attachment-option-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;border:1px solid var(--line);border-radius:9px;background:var(--panel);color:var(--accent)}
+.attachment-option strong{display:block;font-size:13px;font-weight:500;line-height:1.4}
+.attachment-option small{display:block;margin-top:3px;font-size:11px;line-height:1.5;color:var(--muted)}
+.attachment-option[data-attachment="library"]{border-top:1px solid var(--line);margin-top:5px;padding-top:13px;border-radius:0 0 9px 9px}
+.attachment-menu-note{margin:5px 10px 3px;padding-top:8px;font-size:10px;color:var(--muted)}
+.creator-compose>.form-error:empty,.document-panel>.form-error:empty,.chat-reference-panel>.form-error:empty{display:none}
+.document-panel:not(.has-documents){padding:0;margin:0;border:0}
+.document-panel.has-documents{margin:12px 0 0;padding:12px;background:var(--panel);border-radius:10px}
+.document-panel .form-field{margin-top:0}
+.document-panel .document-state{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.document-panel .document-state .note{margin:0;line-height:1.6}
+.document-panel .document-state .btn{flex:none}
+.attachment-status{font-size:12px;color:var(--muted);padding:12px 0 0}
+.chat-reference-panel{margin:12px 0 0}
+.chat-reference-panel:has(.chat-reference-list:empty){margin:0}
+.chat-reference-list:empty{display:none}
+.chat-reference-list{margin-top:0;gap:12px}
+.chat-reference-list figure{width:88px}
+.chat-reference-list img,.chat-reference-list video{width:88px;height:64px;border-radius:8px}
+.chat-reference-list figcaption{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--secondary)}
+@media(max-width:600px){.compose-input{padding:12px}.compose-toolbar{gap:10px}.compose-toolbar .compose-hint{font-size:10px}.creator-compose{padding:14px}.attachment-menu{border-radius:12px}}

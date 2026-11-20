@@ -9,22 +9,20 @@ export function createDocumentFeature(ui) {
     if(!state.c)return '';
     const row=selected();
     const busy=uploading||['queued','running'].includes(state.c.job?.status);
-    return `<section class="document-panel" aria-label="文档创作" data-req="REQ-060"><div class="row">
-      <label class="btn small" for="chat-document-upload">${uploading?'提取中…':'上传 PDF / Word'}</label>
+    return `<section class="document-panel ${rows.length?'has-documents':''}" aria-label="文档创作" data-req="REQ-060">
       <input id="chat-document-upload" type="file" accept=".pdf,.docx" hidden ${!state.c.can_edit||busy?'disabled':''}>
-      <span class="note">最多 20 MB，PDF 最多 12 页，Word 最多 12 张内嵌图。</span>
-      </div>${rows.length?select('创作文档','chat-document-select',[['','不使用文档'],...rows.map(d=>[d.id,d.filename])],selections[state.c.id]||''):''}
-      ${row?`<div class="document-state"><strong>${esc(row.filename)}</strong>
-      <p>${row.content.sections.length} 个段落或页面 · ${row.content.images.length} 张图片</p>
-      <p class="note">${row.status==='confirmed'?'已确认，发送时使用摘要及 '+row.selected_asset_ids.length+' 张参考图。':row.job&&['queued','running'].includes(row.job.status)?'AI 正在理解图文…':'请分析图文并确认后发送。'}</p>
-      ${row.job?.status==='failed'?`<p class="form-error">${esc(row.job.error)}</p>`:''}
-      ${btn('查看解析与确认','document-review','small',`data-id="${row.id}"`)}</div>`:''}
+      ${uploading?'<p class="attachment-status" role="status">正在提取文档图文…</p>':''}${rows.length?select('创作文档','chat-document-select',[['','不使用文档'],...rows.map(d=>[d.id,d.filename])],selections[state.c.id]||''):''}
+      ${row?`<div class="document-state">
+      <p class="note">${row.status==='confirmed'?'已确认 · '+row.selected_asset_ids.length+' 张生成参考图':row.job&&['queued','running'].includes(row.job.status)?'AI 正在理解图文…':row.status==='analyzed'?'图文分析完成，待确认':'已提取 '+row.content.images.length+' 张图片，待分析确认'}</p>
+      ${btn('查看解析与确认','document-review','small',`data-id="${row.id}"`)}</div>
+      ${row.job?.status==='failed'?`<p class="form-error">${esc(row.job.error)}</p>`:''}`:''}
       <p id="document-error" class="form-error" role="alert"></p></section>`;
   }
 
   function draw() {
     const host=$('#chat-document');
     if(host){host.innerHTML=panel();bindInputs();}
+    ui.onStateChange?.();
   }
   function schedule() {
     clearTimeout(timer);
@@ -143,5 +141,5 @@ export function createDocumentFeature(ui) {
     const row=selected();
     if(selections[state.c?.id]&&(!row||row.status!=='confirmed'))throw Error('请先分析并确认文档，或选择“不使用文档”');
   }
-  return {panel,bind,handle,validate};
+  return {panel,bind,handle,validate,isUploading:()=>uploading};
 }
